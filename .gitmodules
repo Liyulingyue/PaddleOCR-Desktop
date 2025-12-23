@@ -1,3 +1,0 @@
-[submodule "backend/oar-ocr"]
-	path = backend/oar-ocr
-	url = https://github.com/GreatV/oar-ocr
