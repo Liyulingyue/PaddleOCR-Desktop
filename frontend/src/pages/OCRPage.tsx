@@ -53,12 +53,10 @@ function OCRPage() {
         loading={loading}
         error={error}
         onUpload={handleUpload}
-        page={page}
-        onPageChange={handlePageChange}
       />
 
       <Viewer file={file} page={page} onPageChange={handlePageChange} />
-      <ResultPanel result={result} />
+      <ResultPanel result={result} imageFile={file} />
     </div>
   )
 }

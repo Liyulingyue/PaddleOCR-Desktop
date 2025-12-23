@@ -1,0 +1,33 @@
+/* 上传区域样式 */
+.upload-area {
+  border: 2px dashed rgba(102, 126, 234, 0.3);
+  border-radius: 15px;
+  padding: 2rem;
+  text-align: center;
+  margin: 2rem 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(102, 126, 234, 0.05);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.upload-area:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.upload-label {
+  display: block;
+  font-size: 1.4rem;
+  color: #667eea;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.upload-area p {
+  margin: 0.5rem 0;
+  color: #666;
+}

@@ -6,11 +6,9 @@ interface SidebarProps {
   loading: boolean
   error: string | null
   onUpload: () => void
-  page: number
-  onPageChange: (page: number) => void
 }
 
-function Sidebar({ onFileSelect, file, loading, error, onUpload, page, onPageChange }: SidebarProps) {
+function Sidebar({ onFileSelect, file, loading, error, onUpload }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -24,16 +22,6 @@ function Sidebar({ onFileSelect, file, loading, error, onUpload, page, onPageCha
             {loading ? '处理中...' : '开始识别'}
           </button>
           {error && <span className="error">{error}</span>}
-        </div>
-      )}
-
-      {file && (
-        <div className="control-section">
-          <div className="page-controls">
-            <button className="nav-btn" onClick={() => onPageChange(Math.max(1, page - 1))}>‹</button>
-            <span className="page-number">{page}</span>
-            <button className="nav-btn" onClick={() => onPageChange(page + 1)}>›</button>
-          </div>
         </div>
       )}
     </aside>
