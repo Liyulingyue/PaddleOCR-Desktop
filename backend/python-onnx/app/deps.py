@@ -1,7 +1,7 @@
 from threading import Lock
 from typing import Optional
 
-from .onnx_paddleocr import ONNXPaddleOcr
+from .core.onnx_paddleocr import ONNXPaddleOcr
 
 _model: Optional[ONNXPaddleOcr] = None
 _lock = Lock()

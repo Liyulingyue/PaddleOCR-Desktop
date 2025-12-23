@@ -243,6 +243,7 @@ def infer_args():
     parser.add_argument("--det_sast_nms_thresh", type=float, default=0.2)
 
     parser.add_argument("--rec_algorithm", type=str, default="CRNN")
+    parser.add_argument("--rec_char_type", type=str, default="en")
     parser.add_argument(
         "--rec_model_dir",
         type=str,

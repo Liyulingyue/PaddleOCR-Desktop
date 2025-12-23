@@ -11,3 +11,4 @@ imgaug
 tqdm
 pdf2image
 pymupdf
+python-multipart
