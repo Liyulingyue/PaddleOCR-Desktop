@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+onnxruntime
+opencv-python-headless
+numpy
+Pillow
+shapely
+pyclipper
+scikit-image
+imgaug
+tqdm
+pdf2image
+pymupdf
