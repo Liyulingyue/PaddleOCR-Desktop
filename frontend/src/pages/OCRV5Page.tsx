@@ -18,6 +18,14 @@ function OCRV5Page() {
     setPage(1)
   }
 
+  const handleClear = () => {
+    setFile(null)
+    setResult(null)
+    setDrawnImage(null)
+    setError(null)
+    setPage(1)
+  }
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
   }
@@ -43,9 +51,12 @@ function OCRV5Page() {
       }
 
       // Fetch drawn image
+      const drawFormData = new FormData()
+      drawFormData.append('file', file)
+      drawFormData.append('ocr_result', JSON.stringify(data))
       const drawResponse = await fetch('http://localhost:8000/api/ocr/draw', {
         method: 'POST',
-        body: new FormData([['file', file]]), // Create new FormData for draw
+        body: drawFormData,
       })
       if (drawResponse.ok) {
         const blob = await drawResponse.blob()
@@ -69,6 +80,7 @@ function OCRV5Page() {
         loading={loading}
         error={error}
         onUpload={handleUpload}
+        onClear={handleClear}
       />
 
       <Viewer file={file} page={page} onPageChange={handlePageChange} />

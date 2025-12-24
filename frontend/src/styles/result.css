@@ -147,6 +147,24 @@
   color: #333;
 }
 
+/* 绘制图像样式，与viewer-content保持一致的居中显示 */
+.drawn-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  height: 100%;
+  min-height: 300px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.drawn-image img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
 /* 下拉选择样式，位于标题行最右侧 */
 .header-controls {
   display: flex;

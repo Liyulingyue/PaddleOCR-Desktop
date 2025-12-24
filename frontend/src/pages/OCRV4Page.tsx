@@ -18,6 +18,14 @@ function OCRV4Page() {
     setPage(1)
   }
 
+  const handleClear = () => {
+    setFile(null)
+    setResult(null)
+    setDrawnImage(null)
+    setError(null)
+    setPage(1)
+  }
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
   }
@@ -69,6 +77,7 @@ function OCRV4Page() {
         loading={loading}
         error={error}
         onUpload={handleUpload}
+        onClear={handleClear}
       />
       <Viewer file={file} page={page} onPageChange={handlePageChange} />
       <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} />
