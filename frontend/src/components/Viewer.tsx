@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 
 interface ViewerProps {
   file: File | null
-  page: number
-  onPageChange: (page: number) => void
 }
 
-function Viewer({ file, page, onPageChange }: ViewerProps) {
+function Viewer({ file }: ViewerProps) {
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -30,28 +28,13 @@ function Viewer({ file, page, onPageChange }: ViewerProps) {
         <h3>原始文件</h3>
         <div className="viewer-controls">
           {isPdf && (
-            <div className="page-controls">
-              <button
-                className="nav-btn"
-                onClick={() => onPageChange(Math.max(1, page - 1))}
-                disabled={page <= 1}
-                title="上一页"
-              >
-                ‹
-              </button>
-              <span className="page-number" title={`第 ${page} 页`}>{page}</span>
-              <button
-                className="nav-btn"
-                onClick={() => onPageChange(page + 1)}
-                title="下一页"
-              >
-                ›
-              </button>
+            <div className="file-info">
+              <span className="file-type">PDF文档</span>
             </div>
           )}
           {isImage && (
-            <div className="page-info">
-              <span className="page-indicator">单页图片</span>
+            <div className="file-info">
+              <span className="file-type">图片文件</span>
             </div>
           )}
         </div>
@@ -60,8 +43,7 @@ function Viewer({ file, page, onPageChange }: ViewerProps) {
         {file ? (
           isPdf ? (
             url ? (
-              // For simplicity we embed the PDF; full page control would require pdf.js
-              <embed src={`${url}#page=${page}`} type="application/pdf" width="100%" height="100%" />
+              <embed src={url} type="application/pdf" width="100%" height="100%" />
             ) : (
               <div className="loading">加载中...</div>
             )

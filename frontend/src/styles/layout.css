@@ -98,3 +98,32 @@
   justify-content: center;
   gap: 8px;
 }
+
+/* 全局消息框样式 */
+.global-message-banner {
+  position: fixed;
+  top: 84px; /* 在HeaderBar下面 */
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  animation: slideDownFade 0.3s ease-out;
+  white-space: nowrap;
+}
+
+@keyframes slideDownFade {
+  from {
+    transform: translateX(-50%) translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}

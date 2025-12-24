@@ -3,10 +3,11 @@ import { useState, useRef, useEffect } from 'react'
 interface ResultPanelProps {
   result: any
   imageFile: File | null
-  drawnImage: string | null
+  drawnImage: string | any[] | null
+  onMessage: (message: string) => void
 }
 
-function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
+function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelProps) {
   const [view, setView] = useState<'json' | 'drawn-image'>('json')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -76,9 +77,11 @@ function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
   const copyResult = async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(result || {}, null, 2))
-      alert('已复制')
+      onMessage('已复制到剪贴板')
+      setTimeout(() => onMessage(''), 2000) // 2秒后自动隐藏
     } catch (e) {
-      alert('复制失败')
+      onMessage('复制失败')
+      setTimeout(() => setMessage(null), 2000)
     }
   }
 
@@ -121,7 +124,24 @@ function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
           ) : (
             <div className="drawn-image">
               {drawnImage ? (
-                <img src={drawnImage} alt="OCR结果绘制" style={{ maxWidth: '100%', height: 'auto' }} />
+                Array.isArray(drawnImage) ? (
+                  // 多张图片（PDF文件）
+                  <div className="pdf-images">
+                    {drawnImage.map((pageData: any, index: number) => (
+                      <div key={index} className="pdf-page">
+                        <div className="page-header">第 {pageData.page} 页</div>
+                        <img 
+                          src={pageData.image} 
+                          alt={`OCR结果绘制 - 第${pageData.page}页`} 
+                          style={{ maxWidth: '100%', height: 'auto' }} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // 单张图片（普通图像文件）
+                  <img src={drawnImage} alt="OCR结果绘制" style={{ maxWidth: '100%', height: 'auto' }} />
+                )
               ) : (
                 <p>绘制图像加载中...</p>
               )}

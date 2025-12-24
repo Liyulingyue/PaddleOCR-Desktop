@@ -27,6 +27,28 @@
   font-weight: 600;
 }
 
+.message-banner {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  padding: 8px 16px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 0.9rem;
+  border-radius: 0;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .result-header {
   display: flex;
   justify-content: space-between;
@@ -253,6 +275,35 @@
   margin-bottom: 0.5rem;
   border-radius: 5px;
   cursor: pointer;
+}
+
+/* PDF多页显示样式 */
+.pdf-images {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pdf-page {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.page-header {
+  background: #f5f5f5;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pdf-page img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .examples li:hover {
