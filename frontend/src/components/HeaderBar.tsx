@@ -3,32 +3,12 @@ import { useState } from 'react'
 
 interface HeaderBarProps {
   title?: string
-  onSettingsClick?: () => void
-  onAboutClick?: () => void
 }
 
 function HeaderBar({
-  title = 'PaddleOCR-Desktop',
-  onSettingsClick,
-  onAboutClick
+  title = 'PaddleOCR Desktop'
 }: HeaderBarProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-
-  const handleSettingsClick = () => {
-    if (onSettingsClick) {
-      onSettingsClick()
-    } else {
-      alert('设置功能即将上线')
-    }
-  }
-
-  const handleAboutClick = () => {
-    if (onAboutClick) {
-      onAboutClick()
-    } else {
-      alert('PaddleOCR-Desktop v1.0.0\n基于PaddleOCR的桌面OCR应用')
-    }
-  }
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen)

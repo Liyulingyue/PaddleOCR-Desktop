@@ -201,3 +201,51 @@ async def draw_ocr_result(
                 return JSONResponse(status_code=400, content={"error": "Invalid OCR result format"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/ocr2text")
+async def ocr_result_to_text(ocr_result: dict = Body(...)):
+    """
+    将OCR识别结果转换为纯文本格式
+    
+    参数:
+    - ocr_result: OCR识别结果的JSON对象
+    
+    返回:
+    - {"text": "提取的完整文本内容"}
+    """
+    try:
+        if not ocr_result or "result" not in ocr_result:
+            return JSONResponse(status_code=400, content={"error": "Invalid OCR result format"})
+        
+        result_data = ocr_result["result"]
+        all_text_lines = []
+        
+        # 检查是否为多页PDF结果
+        if isinstance(result_data, list) and len(result_data) > 0 and isinstance(result_data[0], dict) and "page" in result_data[0]:
+            # 多页PDF结果 - 合并所有页面的文本
+            for page_data in result_data:
+                page_result = page_data.get("result", [])
+                
+                if page_result and isinstance(page_result, list) and len(page_result) > 0:
+                    # 提取该页的所有文本行
+                    for line in page_result[0] if page_result else []:
+                        if isinstance(line, list) and len(line) >= 2:
+                            text = line[1][0] if isinstance(line[1], list) and len(line[1]) >= 1 else ""
+                            if text.strip():
+                                all_text_lines.append(text)
+        else:
+            # 单页图像结果
+            if result_data and isinstance(result_data, list) and len(result_data) > 0:
+                for line in result_data[0] if result_data[0] else []:
+                    if isinstance(line, list) and len(line) >= 2:
+                        text = line[1][0] if isinstance(line[1], list) and len(line[1]) >= 1 else ""
+                        if text.strip():
+                            all_text_lines.append(text)
+        
+        # 合并所有文本行
+        full_text = "\n".join(all_text_lines)
+        return {"text": full_text}
+                
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"文本提取失败: {str(e)}"})

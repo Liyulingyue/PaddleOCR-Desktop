@@ -12,20 +12,9 @@ import './styles/result.css'
 import './pages/HomePage.css'
 
 function App() {
-  const handleSettingsClick = () => {
-    alert('设置功能即将上线')
-  }
-
-  const handleAboutClick = () => {
-    alert('PaddleOCR-Desktop v1.0.0\n基于PaddleOCR的桌面OCR应用\n\n技术栈：\n- 前端：React + TypeScript + Vite\n- 后端：Python + FastAPI\n- OCR引擎：PaddleOCR')
-  }
-
   return (
     <Router>
-      <HeaderBar
-        onSettingsClick={handleSettingsClick}
-        onAboutClick={handleAboutClick}
-      />
+      <HeaderBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/ocrv5" element={<OCRV5Page />} />

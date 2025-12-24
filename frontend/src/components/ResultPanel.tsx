@@ -7,8 +7,49 @@ interface ResultPanelProps {
   onMessage: (message: string) => void
 }
 
+// 从OCR结果中提取纯文本
+function extractTextFromResult(result: any): string {
+  if (!result) return ''
+  
+  const resultData = result
+  const textLines: string[] = []
+  
+  // 检查是否为多页PDF结果
+  if (Array.isArray(resultData) && resultData.length > 0 && typeof resultData[0] === 'object' && 'page' in resultData[0]) {
+    // 多页PDF结果
+    for (const pageData of resultData) {
+      const pageResult = pageData.result
+      if (pageResult && Array.isArray(pageResult) && pageResult.length > 0) {
+        // 提取该页的所有文本行
+        for (const line of pageResult[0] || []) {
+          if (Array.isArray(line) && line.length >= 2) {
+            const text = Array.isArray(line[1]) && line[1].length >= 1 ? line[1][0] : ''
+            if (text && text.trim()) {
+              textLines.push(text)
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // 单页图像结果
+    if (Array.isArray(resultData) && resultData.length > 0) {
+      for (const line of resultData[0] || []) {
+        if (Array.isArray(line) && line.length >= 2) {
+          const text = Array.isArray(line[1]) && line[1].length >= 1 ? line[1][0] : ''
+          if (text && text.trim()) {
+            textLines.push(text)
+          }
+        }
+      }
+    }
+  }
+  
+  return textLines.join('\n')
+}
+
 function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelProps) {
-  const [view, setView] = useState<'json' | 'drawn-image'>('json')
+  const [view, setView] = useState<'json' | 'drawn-image' | 'ocr-text'>('json')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -76,21 +117,47 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
 
   const copyResult = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(result || {}, null, 2))
+      let contentToCopy: string
+      
+      if (view === 'ocr-text') {
+        // 复制纯文本内容
+        contentToCopy = extractTextFromResult(result)
+      } else {
+        // 复制JSON格式的结果
+        contentToCopy = JSON.stringify(result || {}, null, 2)
+      }
+      
+      await navigator.clipboard.writeText(contentToCopy)
       onMessage('已复制到剪贴板')
       setTimeout(() => onMessage(''), 2000) // 2秒后自动隐藏
     } catch (e) {
       onMessage('复制失败')
-      setTimeout(() => setMessage(null), 2000)
+      setTimeout(() => onMessage(''), 2000)
     }
   }
 
   const downloadResult = () => {
-    const blob = new Blob([JSON.stringify(result || {}, null, 2)], { type: 'application/json' })
+    let content: string
+    let filename: string
+    let mimeType: string
+    
+    if (view === 'ocr-text') {
+      // 下载纯文本内容
+      content = extractTextFromResult(result)
+      filename = 'ocr_result.txt'
+      mimeType = 'text/plain'
+    } else {
+      // 下载JSON格式的结果
+      content = JSON.stringify(result || {}, null, 2)
+      filename = 'ocr_result.json'
+      mimeType = 'application/json'
+    }
+    
+    const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'result.json'
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -109,10 +176,11 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
             id="view-select"
             className="view-select"
             value={view}
-            onChange={(e) => setView(e.target.value as 'json' | 'drawn-image')}
+            onChange={(e) => setView(e.target.value as 'json' | 'drawn-image' | 'ocr-text')}
           >
             <option value="json">JSON</option>
             <option value="drawn-image">绘制图像</option>
+            <option value="ocr-text">纯文本</option>
           </select>
         </div>
       </div>
@@ -121,6 +189,10 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
         {result ? (
           view === 'json' ? (
             <pre>{JSON.stringify(result, null, 2)}</pre>
+          ) : view === 'ocr-text' ? (
+            <div className="ocr-text">
+              <pre>{extractTextFromResult(result)}</pre>
+            </div>
           ) : (
             <div className="drawn-image">
               {drawnImage ? (

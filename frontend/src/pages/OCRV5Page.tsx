@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
+import { getApiBaseUrl } from '../utils/api'
 
 function OCRV5Page() {
   const [file, setFile] = useState<File | null>(null)
@@ -40,10 +41,6 @@ function OCRV5Page() {
     setError(null)
   }
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
-  }
-
   const handleUpload = async () => {
     if (!file) return
     setLoading(true)
@@ -56,7 +53,7 @@ function OCRV5Page() {
 
     try {
       // Fetch OCR result
-      const response = await fetch('http://localhost:8000/api/ocr', {
+      const response = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       })
@@ -72,7 +69,7 @@ function OCRV5Page() {
       drawFormData.append('file', file)
       drawFormData.append('ocr_result', JSON.stringify(data))
       drawFormData.append('drop_score', config.dropScore.toString())
-      const drawResponse = await fetch('http://localhost:8000/api/ocr/draw', {
+      const drawResponse = await fetch('/api/ocr/draw', {
         method: 'POST',
         body: drawFormData,
       })
@@ -134,7 +131,8 @@ function OCRV5Page() {
             <div className="api-modal-content">
               <div className="api-section">
                 <h4>🔗 接口地址</h4>
-                <code className="api-url">http://localhost:8000</code>
+                <code className="api-url">{getApiBaseUrl()}</code>
+                <p className="api-note">API路径会自动转发到后端服务器</p>
               </div>
 
               <div className="api-section">
@@ -150,6 +148,13 @@ function OCRV5Page() {
                     <li><code>det_db_thresh</code>: 检测阈值 (0.0-1.0，默认: 0.3)</li>
                     <li><code>cls_thresh</code>: 分类阈值 (0.0-1.0，默认: 0.9)</li>
                     <li><code>use_cls</code>: 是否使用文本方向分类 (true/false，默认: true)</li>
+                  </ul>
+                  <h5>PDF文件处理说明：</h5>
+                  <ul>
+                    <li>PDF文件会被转换为高分辨率图像（300 DPI）进行OCR识别</li>
+                    <li>多页PDF会逐页处理，每页返回独立的OCR结果</li>
+                    <li>需要安装pymupdf库才能处理PDF文件</li>
+                    <li>如果PDF页面包含透明背景，会自动转换为RGB格式</li>
                   </ul>
                 </div>
               </div>
@@ -167,54 +172,125 @@ function OCRV5Page() {
                     <li><code>ocr_result</code>: OCR识别结果的JSON字符串</li>
                     <li><code>drop_score</code>: 绘制阈值 (0.0-1.0，默认: 0.5)</li>
                   </ul>
+                  <h5>PDF文件处理说明：</h5>
+                  <ul>
+                    <li>PDF文件的每一页都会根据对应的OCR结果绘制识别框和文本</li>
+                    <li>返回每页的base64编码PNG图像</li>
+                    <li>如果某页没有有效的OCR结果，会返回原始页面图像</li>
+                  </ul>
                 </div>
               </div>
 
               <div className="api-section">
-                <h4>🐍 Python 调用示例</h4>
+                <h4>� OCR转文本接口</h4>
+                <div className="api-endpoint">
+                  <code className="method">POST</code>
+                  <code className="endpoint">/api/ocr/ocr2text</code>
+                </div>
+                <div className="api-params">
+                  <h5>参数：</h5>
+                  <ul>
+                    <li><code>ocr_result</code>: OCR识别结果的JSON对象（请求体）</li>
+                  </ul>
+                  <h5>功能说明：</h5>
+                  <ul>
+                    <li>将结构化的OCR结果转换为纯文本格式</li>
+                    <li>自动提取每行识别的文本内容</li>
+                    <li>多页PDF的所有页面文本会连续合并</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="api-section">
+                <h4>�🐍 Python 调用示例</h4>
                 <div className="code-example">
                   <pre>{`import requests
+import json
 
 # OCR识别示例
-def ocr_image(file_path):
-    url = "http://localhost:8000/api/ocr"
+def ocr_file(file_path, api_base_url="{getApiBaseUrl()}"):
+    url = f"{api_base_url}/api/ocr"
     
     with open(file_path, 'rb') as f:
         files = {'file': f}
-        data = {
+        data = {{
             'det_db_thresh': '0.3',
             'cls_thresh': '0.9', 
             'use_cls': 'true'
-        }
+        }}
         response = requests.post(url, files=files, data=data)
         return response.json()
 
 # 绘制结果示例  
-def draw_ocr_result(file_path, ocr_result):
-    url = "http://localhost:8000/api/ocr/draw"
+def draw_ocr_result(file_path, ocr_result, api_base_url="{getApiBaseUrlString()}"):
+    url = f"{api_base_url}/api/ocr/draw"
     
     with open(file_path, 'rb') as f:
         files = {'file': f}
-        data = {
+        data = {{
             'ocr_result': json.dumps(ocr_result),
             'drop_score': '0.5'
-        }
+        }}
         response = requests.post(url, files=files, data=data)
         
-        # 对于图片文件，返回PNG图片
-        if response.headers.get('content-type', '').startswith('image/'):
+        # 检查响应类型
+        content_type = response.headers.get('content-type', '')
+        
+        if content_type.startswith('image/'):
+            # 单张图片（用于普通图像文件）
             with open('result.png', 'wb') as f:
                 f.write(response.content)
-        # 对于PDF文件，返回JSON格式的多页图片
+            print("结果已保存为 result.png")
         else:
+            # JSON响应（用于PDF文件，返回多页base64图片）
             result = response.json()
-            # result['result'] 包含每页的base64图片数据
+            if 'result' in result and isinstance(result['result'], list):
+                for page_data in result['result']:
+                    page_num = page_data.get('page', 'unknown')
+                    image_data = page_data.get('image', '')
+                    if image_data.startswith('data:image/png;base64,'):
+                        # 保存每页图片
+                        import base64
+                        image_bytes = base64.b64decode(image_data.split(',')[1])
+                        filename = f'result_page_{page_num}.png'
+                        with open(filename, 'wb') as f:
+                            f.write(image_bytes)
+                        print(f"第{page_num}页结果已保存为 {filename}")
+            else:
+                print("绘制结果处理失败")
+
+# OCR结果转文本示例
+def ocr_result_to_text(ocr_result, api_base_url="{getApiBaseUrlString()}"):
+    url = f"{api_base_url}/api/ocr/ocr2text"
+    
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url, json=ocr_result, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"错误: {response.status_code}, {response.text}")
+        return None
 
 # 使用示例
 if __name__ == "__main__":
-    # 识别图片
-    result = ocr_image("example.jpg")
-    print("OCR结果:", result)
+    # 识别图片文件
+    result = ocr_file("example.jpg")
+    print("OCR结果:", json.dumps(result, indent=2, ensure_ascii=False))
+    
+    # 将OCR结果转换为纯文本
+    text_result = ocr_result_to_text(result)
+    if text_result:
+        print("提取的文本:", text_result['text'])
+    
+    # 识别PDF文件
+    pdf_result = ocr_file("document.pdf")
+    print("PDF OCR结果:", json.dumps(pdf_result, indent=2, ensure_ascii=False))
+    
+    # 将PDF OCR结果转换为纯文本
+    pdf_text_result = ocr_result_to_text(pdf_result)
+    if pdf_text_result:
+        print("PDF文本:", pdf_text_result['text'])
     
     # 绘制结果
     draw_ocr_result("example.jpg", result)`}</pre>
@@ -261,6 +337,11 @@ if __name__ == "__main__":
     },
     ...
   ]
+}`}</pre>
+
+                  <h5>OCR转文本结果：</h5>
+                  <pre>{`{
+  "text": "这是识别出的文本内容\\n第二行文本\\n第三行文本\\n第二页的文本内容\\n第二行\\n第三行"
 }`}</pre>
                 </div>
               </div>

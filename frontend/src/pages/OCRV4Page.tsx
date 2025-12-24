@@ -40,10 +40,6 @@ function OCRV4Page() {
     setError(null)
   }
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
-  }
-
   const handleUpload = async () => {
     if (!file) return
     setLoading(true)
