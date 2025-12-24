@@ -64,6 +64,9 @@ class TextClassifier(PredictBase):
                 norm_img = self.resize_norm_img(img_list[indices[ino]])
                 norm_img = norm_img[np.newaxis, :]
                 norm_img_batch.append(norm_img)
+            if len(norm_img_batch) == 0:
+                # 没有可用图片，直接返回空结果
+                return [], []
             norm_img_batch = np.concatenate(norm_img_batch)
             norm_img_batch = norm_img_batch.copy()
 

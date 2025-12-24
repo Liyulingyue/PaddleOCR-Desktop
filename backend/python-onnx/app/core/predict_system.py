@@ -58,6 +58,9 @@ class TextSystem(object):
             img_crop_list, angle_list = self.text_classifier(img_crop_list)
 
         # 图像识别
+        if not img_crop_list:
+            # 没有可识别的图片块，直接返回空
+            return [], []
         rec_res = self.text_recognizer(img_crop_list)
 
         if self.args.save_crop_res:

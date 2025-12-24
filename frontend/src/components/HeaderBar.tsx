@@ -1,3 +1,6 @@
+import { Link } from 'react-router-dom'
+import { useState } from 'react'
+
 interface HeaderBarProps {
   title?: string
   onSettingsClick?: () => void
@@ -9,6 +12,8 @@ function HeaderBar({
   onSettingsClick,
   onAboutClick
 }: HeaderBarProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
   const handleSettingsClick = () => {
     if (onSettingsClick) {
       onSettingsClick()
@@ -25,28 +30,55 @@ function HeaderBar({
     }
   }
 
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen)
+  }
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false)
+  }
+
   return (
-    <header className="header-bar">
-      <div className="header-content">
-        <h1 className="app-title">{title}</h1>
-        <div className="header-actions">
-          <button
-            className="header-btn settings-btn"
-            onClick={handleSettingsClick}
-            title="设置"
-          >
-            ⚙️
-          </button>
-          <button
-            className="header-btn about-btn"
-            onClick={handleAboutClick}
-            title="关于"
-          >
-            ℹ️
-          </button>
+    <>
+      <header className="header-bar">
+        <div className="header-content">
+          <div className="header-left">
+            <button
+              className="menu-btn"
+              onClick={toggleSidebar}
+              title="菜单"
+            >
+              ☰
+            </button>
+            <Link to="/" className="home-link" onClick={closeSidebar}>
+              <h1 className="app-title">{title}</h1>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Sidebar */}
+      <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-overlay" onClick={closeSidebar}></div>
+        <div className="sidebar-content">
+          <div className="sidebar-header">
+            <h2>导航菜单</h2>
+            <button className="sidebar-close" onClick={closeSidebar}>✕</button>
+          </div>
+          <nav className="sidebar-nav">
+            <Link to="/" className="sidebar-link" onClick={closeSidebar}>
+              🏠 首页
+            </Link>
+            <Link to="/ocrv5" className="sidebar-link" onClick={closeSidebar}>
+              🤖 OCR识别 (V5)
+            </Link>
+            {/* <Link to="/ocrv4" className="sidebar-link" onClick={closeSidebar}>
+              📷 OCR识别 (V4)
+            </Link> */}
+          </nav>
         </div>
       </div>
-    </header>
+    </>
   )
 }
 

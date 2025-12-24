@@ -8,10 +8,10 @@ interface SidebarProps {
   onUpload: () => void
 }
 
-function Sidebar({ onFileSelect, file, loading, error, onUpload }: SidebarProps) {
+function ControlBar({ onFileSelect, file, loading, error, onUpload }: SidebarProps) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
+    <aside className="control-bar">
+      <div className="control-bar-header">
         <h3>控制板</h3>
       </div>
       <FileUpload onFileSelect={onFileSelect} />
@@ -28,4 +28,4 @@ function Sidebar({ onFileSelect, file, loading, error, onUpload }: SidebarProps)
   )
 }
 
-export default Sidebar
+export default ControlBar

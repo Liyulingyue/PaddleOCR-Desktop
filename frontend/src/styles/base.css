@@ -23,11 +23,10 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow-x: hidden; /* 防止页面水平溢出导致横向滚动 */
 }
 
 h1 {

@@ -7,7 +7,7 @@ interface ResultPanelProps {
 }
 
 function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
-  const [view, setView] = useState<'ocr-text' | 'markdown' | 'json' | 'drawn-image'>('ocr-text')
+  const [view, setView] = useState<'json' | 'drawn-image'>('json')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -106,10 +106,8 @@ function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
             id="view-select"
             className="view-select"
             value={view}
-            onChange={(e) => setView(e.target.value as 'ocr-text' | 'markdown' | 'json' | 'drawn-image')}
+            onChange={(e) => setView(e.target.value as 'json' | 'drawn-image')}
           >
-            <option value="ocr-text">OCR识别</option>
-            <option value="markdown">Markdown</option>
             <option value="json">JSON</option>
             <option value="drawn-image">绘制图像</option>
           </select>
@@ -120,27 +118,12 @@ function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
         {result ? (
           view === 'json' ? (
             <pre>{JSON.stringify(result, null, 2)}</pre>
-          ) : view === 'markdown' ? (
-            <div className="markdown">{/* 简单渲染，后续可用 markdown-it */}
-              <pre>{result.text || JSON.stringify(result, null, 2)}</pre>
-            </div>
-          ) : view === 'drawn-image' ? (
+          ) : (
             <div className="drawn-image">
               {drawnImage ? (
                 <img src={drawnImage} alt="OCR结果绘制" style={{ maxWidth: '100%', height: 'auto' }} />
               ) : (
                 <p>绘制图像加载中...</p>
-              )}
-            </div>
-          ) : (
-            <div className="ocr-text">
-              {imageFile ? (
-                <canvas 
-                  ref={canvasRef} 
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                />
-              ) : (
-                <pre>{result.text || '暂无识别结果'}</pre>
               )}
             </div>
           )

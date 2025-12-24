@@ -12,18 +12,37 @@
 /* Layout for three-column page: 控制板 + 两个并列等宽面板 */
 .layout {
   display: grid;
-  /* 左侧控制板固定 300px，右侧两个等宽并可收缩的列 */
-  grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
+  /* 左侧控制板固定 360px，中间更宽以用于主预览，右侧为结果面板 */
+  grid-template-columns: 360px 1fr 1fr;
+
+/* 无结果时折叠右侧结果面板，让中间占满剩余空间 */
+.layout.no-result {
+  grid-template-columns: 360px minmax(0, 2.6fr); /* 中间更宽 */
+}
+.layout.no-result .result-panel {
+  display: none;
+}
   gap: 20px;
-  height: calc(100vh - 120px); /* 调整高度以适应HeaderBar */
-  padding: 20px;
+  height: 100vh; /* 改为全高 */
+  padding: 84px 0px 10px; /* 顶部为 Header 留空，左右内边距更小 */
   box-sizing: border-box;
-  width: 100vw; /* 占满可视宽度，避免被上层居中约束 */
+  width: 100%; /* 使用 100% 避免 100vw 包含滚动条导致水平滚动 */
+  max-width: 1600px; /* 阻止超宽屏过度拉伸 */
+  margin: 0 auto; /* 大屏居中 */
   align-items: stretch;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.sidebar {
+/* 小屏适配：堆叠布局并减少左右内边距 */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 84px 16px 20px;
+    gap: 12px;
+  }
+}
+
+.control-bar {
   background: rgba(255, 255, 255, 0.95);
   border: none;
   border-radius: 20px;
@@ -33,19 +52,19 @@
   backdrop-filter: blur(10px);
 }
 
-.sidebar-header h3 {
+.control-bar-header h3 {
   margin: 0 0 16px 0;
   color: #333;
   font-size: 1.4rem;
   font-weight: 700;
 }
 
-.sidebar .recent ul {
+.control-bar .recent ul {
   list-style: none;
   padding: 0;
 }
 
-.sidebar .recent li {
+.control-bar .recent li {
   padding: 12px 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   cursor: pointer;
@@ -54,7 +73,7 @@
   color: #555;
 }
 
-.sidebar .recent li:hover {
+.control-bar .recent li:hover {
   background: rgba(102, 126, 234, 0.1);
   color: #667eea;
   transform: translateX(5px);

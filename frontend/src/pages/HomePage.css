@@ -1,0 +1,281 @@
+.home-page {
+  padding-top: 64px; /* 为固定 Header 留出空间 */
+  min-height: calc(100vh - 64px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 100%;
+  box-sizing: border-box;
+  animation: fadeIn 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-section {
+  width: 100%;
+  padding: 4rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  width: 100%;
+  display: flex;
+  gap: 4rem; /* 增加间距让内容更集中 */
+  align-items: center;
+  justify-content: center; /* 改为居中，让两侧都向中心靠拢 */
+  padding: 0 3rem; /* 增加内边距 */
+  position: relative;
+  z-index: 1;
+}
+
+.hero-content {
+  flex: 1 1 60%;
+  max-width: none;
+  width: 100%;
+  text-align: left;
+  padding: 0 1rem;
+  animation: slideInLeft 1.2s ease-out;
+  margin-left: 10rem; /* 更小的偏移，更靠近中心 */
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.hero-visual {
+  flex: 1 1 45%; /* 增加flex比例，让展示板占据更大宽度 */
+  min-height: 320px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  box-shadow: 
+    0 20px 40px rgba(0,0,0,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: slideInRight 1.2s ease-out;
+  margin-right: 10rem; /* 仅保留小幅右侧间距 */
+  margin-left: 10rem;  /* 仅保留小幅左侧间距 */
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.hero-visual::before {
+  content: '🚀';
+  font-size: 4rem;
+  opacity: 0.8;
+}
+
+/* 大屏时 hero 两栏占满宽度，小屏仍堆叠 */
+@media (max-width: 1100px) {
+  .hero-inner { flex-direction: column; padding: 0 1rem; }
+  .hero-visual { display: none; }
+}
+
+.hero-section h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.hero-section p {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+  line-height: 1.6;
+}
+
+.feature-buttons {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.primary-btn, .secondary-btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.primary-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.primary-btn:hover::before {
+  left: 100%;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ff8a6b);
+  color: white;
+  box-shadow: 0 8px 25px rgba(255,107,107,0.3);
+}
+
+.primary-btn:hover { 
+  transform: translateY(-4px);
+  box-shadow: 0 12px 35px rgba(255,107,107,0.4);
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.secondary-btn:hover { 
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.features-section {
+  width: 100%;
+  max-width: none;
+  margin: 4rem 0 5rem;
+  padding: 0 3rem;
+  box-sizing: border-box;
+  text-align: center;
+  position: relative;
+}
+
+.features-section::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  background: linear-gradient(90deg, #ff6b6b, #667eea);
+  border-radius: 2px;
+}
+
+/* 更大屏幕上让卡片居中扩展 */
+@media (min-width: 1100px) {
+  .features-grid { max-width: 1200px; margin: 0 auto; }
+}
+
+.features-section h2 { 
+  font-size: 2.2rem; 
+  margin-bottom: 2rem;
+  font-weight: 700;
+  background: linear-gradient(45deg, #fff, #e0e7ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(15px);
+  border-radius: 20px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transition: left 0.6s;
+}
+
+.feature-card:hover::before {
+  left: 100%;
+}
+
+.feature-card:hover { 
+  transform: translateY(-8px) scale(1.02); 
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.feature-card h3 { 
+  font-size: 1.4rem; 
+  margin-bottom: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.feature-card h3::before {
+  content: '✨';
+  font-size: 1.2rem;
+}
+
+.feature-card p { 
+  opacity: 0.9; 
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+/* 为不同卡片添加不同的图标 */
+.feature-card:nth-child(1) h3::before { content: '🤖'; }
+.feature-card:nth-child(2) h3::before { content: '🎨'; }
+.feature-card:nth-child(3) h3::before { content: '📄'; }
+.feature-card:nth-child(4) h3::before { content: '⚡'; }
+
+/* Small screens */
+@media (max-width: 720px) {
+  .hero-section { padding: 2.5rem 1rem; }
+  .hero-section h1 { font-size: 2.2rem; }
+  .hero-section p { font-size: 1rem; }
+  .home-page { padding-top: 56px; }
+  .features-section { padding: 0 1.5rem; margin: 3rem 0 4rem; }
+  .features-section h2 { font-size: 1.8rem; }
+  .feature-card { padding: 1.5rem; }
+  .feature-card h3 { font-size: 1.2rem; }
+  .primary-btn, .secondary-btn { padding: 12px 24px; font-size: 0.9rem; }
+}

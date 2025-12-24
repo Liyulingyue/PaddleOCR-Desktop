@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import Sidebar from '../components/Sidebar'
+import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
 
-function OCRPage() {
+function OCRV5Page() {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<any>(null)
   const [drawnImage, setDrawnImage] = useState<string | null>(null)
@@ -62,8 +62,8 @@ function OCRPage() {
   }
 
   return (
-    <div className="layout">
-      <Sidebar
+    <div className={`layout ${result ? '' : 'no-result'}`}>
+      <ControlBar
         onFileSelect={handleFileSelect}
         file={file}
         loading={loading}
@@ -77,4 +77,4 @@ function OCRPage() {
   )
 }
 
-export default OCRPage
+export default OCRV5Page
