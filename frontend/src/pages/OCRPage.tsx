@@ -6,6 +6,7 @@ import ResultPanel from '../components/ResultPanel'
 function OCRPage() {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<any>(null)
+  const [drawnImage, setDrawnImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -13,6 +14,7 @@ function OCRPage() {
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
     setResult(null)
+    setDrawnImage(null)
     setPage(1)
   }
 
@@ -28,6 +30,7 @@ function OCRPage() {
     formData.append('file', file)
 
     try {
+      // Fetch OCR result
       const response = await fetch('http://localhost:8000/api/ocr', {
         method: 'POST',
         body: formData,
@@ -37,6 +40,19 @@ function OCRPage() {
         setResult(data.result)
       } else {
         setError(data.error || '上传失败')
+      }
+
+      // Fetch drawn image
+      const drawResponse = await fetch('http://localhost:8000/api/ocr/draw', {
+        method: 'POST',
+        body: new FormData([['file', file]]), // Create new FormData for draw
+      })
+      if (drawResponse.ok) {
+        const blob = await drawResponse.blob()
+        const imageUrl = URL.createObjectURL(blob)
+        setDrawnImage(imageUrl)
+      } else {
+        console.error('Failed to fetch drawn image')
       }
     } catch (err) {
       setError('网络错误')
@@ -56,7 +72,7 @@ function OCRPage() {
       />
 
       <Viewer file={file} page={page} onPageChange={handlePageChange} />
-      <ResultPanel result={result} imageFile={file} />
+      <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} />
     </div>
   )
 }

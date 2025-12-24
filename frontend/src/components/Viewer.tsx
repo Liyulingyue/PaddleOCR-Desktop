@@ -59,10 +59,16 @@ function Viewer({ file, page, onPageChange }: ViewerProps) {
       <div className="viewer-content">
         {file ? (
           isPdf ? (
-            // For simplicity we embed the PDF; full page control would require pdf.js
-            <embed src={`${url || ''}#page=${page}`} type="application/pdf" width="100%" height="100%" />
+            url ? (
+              // For simplicity we embed the PDF; full page control would require pdf.js
+              <embed src={`${url}#page=${page}`} type="application/pdf" width="100%" height="100%" />
+            ) : (
+              <div className="loading">加载中...</div>
+            )
+          ) : url ? (
+            <img src={url} alt={file.name} />
           ) : (
-            <img src={url || ''} alt={file.name} />
+            <div className="loading">加载中...</div>
           )
         ) : (
           <div className="empty-state">

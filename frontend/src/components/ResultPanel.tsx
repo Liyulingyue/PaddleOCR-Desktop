@@ -3,10 +3,11 @@ import { useState, useRef, useEffect } from 'react'
 interface ResultPanelProps {
   result: any
   imageFile: File | null
+  drawnImage: string | null
 }
 
-function ResultPanel({ result, imageFile }: ResultPanelProps) {
-  const [view, setView] = useState<'ocr-text' | 'markdown' | 'json'>('ocr-text')
+function ResultPanel({ result, imageFile, drawnImage }: ResultPanelProps) {
+  const [view, setView] = useState<'ocr-text' | 'markdown' | 'json' | 'drawn-image'>('ocr-text')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -105,11 +106,12 @@ function ResultPanel({ result, imageFile }: ResultPanelProps) {
             id="view-select"
             className="view-select"
             value={view}
-            onChange={(e) => setView(e.target.value as 'ocr-text' | 'markdown' | 'json')}
+            onChange={(e) => setView(e.target.value as 'ocr-text' | 'markdown' | 'json' | 'drawn-image')}
           >
             <option value="ocr-text">OCR识别</option>
             <option value="markdown">Markdown</option>
             <option value="json">JSON</option>
+            <option value="drawn-image">绘制图像</option>
           </select>
         </div>
       </div>
@@ -121,6 +123,14 @@ function ResultPanel({ result, imageFile }: ResultPanelProps) {
           ) : view === 'markdown' ? (
             <div className="markdown">{/* 简单渲染，后续可用 markdown-it */}
               <pre>{result.text || JSON.stringify(result, null, 2)}</pre>
+            </div>
+          ) : view === 'drawn-image' ? (
+            <div className="drawn-image">
+              {drawnImage ? (
+                <img src={drawnImage} alt="OCR结果绘制" style={{ maxWidth: '100%', height: 'auto' }} />
+              ) : (
+                <p>绘制图像加载中...</p>
+              )}
             </div>
           ) : (
             <div className="ocr-text">
