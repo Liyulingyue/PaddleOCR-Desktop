@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
-import { getApiBaseUrl } from '../utils/api'
+import { getCachedApiBaseUrl } from '../utils/api'
 
 function OCRV5Page() {
   const [file, setFile] = useState<File | null>(null)
@@ -18,6 +18,20 @@ function OCRV5Page() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('http://localhost:8000')
+
+  // 获取API基础URL
+  useEffect(() => {
+    const fetchApiUrl = async () => {
+      try {
+        const url = await getCachedApiBaseUrl()
+        setApiBaseUrl(url)
+      } catch (error) {
+        console.error('Failed to get API URL:', error)
+      }
+    }
+    fetchApiUrl()
+  }, [])
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
@@ -45,15 +59,19 @@ function OCRV5Page() {
     if (!file) return
     setLoading(true)
     setError(null)
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('det_db_thresh', config.detThresh.toString())
-    formData.append('cls_thresh', config.clsThresh.toString())
-    formData.append('use_cls', config.useCls.toString())
 
     try {
+      // 获取API基础URL
+      const apiBaseUrl = await getCachedApiBaseUrl()
+
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('det_db_thresh', config.detThresh.toString())
+      formData.append('cls_thresh', config.clsThresh.toString())
+      formData.append('use_cls', config.useCls.toString())
+
       // Fetch OCR result
-      const response = await fetch('/api/ocr', {
+      const response = await fetch(`${apiBaseUrl}/api/ocr`, {
         method: 'POST',
         body: formData,
       })
@@ -69,7 +87,7 @@ function OCRV5Page() {
       drawFormData.append('file', file)
       drawFormData.append('ocr_result', JSON.stringify(data))
       drawFormData.append('drop_score', config.dropScore.toString())
-      const drawResponse = await fetch('/api/ocr/draw', {
+      const drawResponse = await fetch(`${apiBaseUrl}/api/ocr/draw`, {
         method: 'POST',
         body: drawFormData,
       })
@@ -131,7 +149,7 @@ function OCRV5Page() {
             <div className="api-modal-content">
               <div className="api-section">
                 <h4>🔗 接口地址</h4>
-                <code className="api-url">{getApiBaseUrl()}</code>
+                <code className="api-url">{apiBaseUrl}</code>
                 <p className="api-note">API路径会自动转发到后端服务器</p>
               </div>
 
@@ -208,7 +226,7 @@ function OCRV5Page() {
 import json
 
 # OCR识别示例
-def ocr_file(file_path, api_base_url="{getApiBaseUrl()}"):
+def ocr_file(file_path, api_base_url="${apiBaseUrl}"):
     url = f"{api_base_url}/api/ocr"
     
     with open(file_path, 'rb') as f:
@@ -222,7 +240,7 @@ def ocr_file(file_path, api_base_url="{getApiBaseUrl()}"):
         return response.json()
 
 # 绘制结果示例  
-def draw_ocr_result(file_path, ocr_result, api_base_url="{getApiBaseUrlString()}"):
+def draw_ocr_result(file_path, ocr_result, api_base_url="${apiBaseUrl}"):
     url = f"{api_base_url}/api/ocr/draw"
     
     with open(file_path, 'rb') as f:
@@ -260,7 +278,7 @@ def draw_ocr_result(file_path, ocr_result, api_base_url="{getApiBaseUrlString()}
                 print("绘制结果处理失败")
 
 # OCR结果转文本示例
-def ocr_result_to_text(ocr_result, api_base_url="{getApiBaseUrlString()}"):
+def ocr_result_to_text(ocr_result, api_base_url="${apiBaseUrl}"):
     url = f"{api_base_url}/api/ocr/ocr2text"
     
     headers = {'Content-Type': 'application/json'}

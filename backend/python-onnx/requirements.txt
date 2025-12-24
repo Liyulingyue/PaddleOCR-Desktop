@@ -12,3 +12,4 @@ tqdm
 pdf2image
 pymupdf
 python-multipart
+pyinstaller
