@@ -21,10 +21,7 @@ export const getApiBaseUrl = async (): Promise<string> => {
   // 在Tauri环境中，通过invoke获取后端URL
   if (isTauri()) {
     try {
-      // 首先尝试启动后端（如果还没启动）
-      await invoke('start_backend');
-
-      // 然后获取后端URL
+      // 通过 Tauri 获取后端 URL（后端在 Rust 初始化时已尝试启动）
       const backendUrl: string = await invoke('get_backend_url');
       return backendUrl;
     } catch (error) {

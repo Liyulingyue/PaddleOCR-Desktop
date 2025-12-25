@@ -46,8 +46,9 @@ def main():
     backend_port = find_random_available_port(1024, 65535)
 
     print(f"[INFO] Starting PaddleOCR backend on port {backend_port}")
-    print(f"PORT:{backend_port}", flush=True)
-    sys.stderr.write(f"[INFO] Backend port allocated: {backend_port}\n")
+    print(f"[PORT] Backend port allocated: {backend_port}", flush=True)
+    sys.stderr.write(f"[PORT] Backend port allocated: {backend_port}\n")
+    sys.stderr.flush()
     sys.stderr.flush()
 
     # 保存端口信息到文件（备用方案）
