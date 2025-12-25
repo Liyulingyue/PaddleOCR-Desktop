@@ -76,6 +76,21 @@ if (Test-Path $backendExe) {
     Write-Host "Warning: Backend executable not found at $backendExe" -ForegroundColor Yellow
 }
 
+# Copy models directory to Tauri directory for bundling
+$modelsDir = "$projectRoot\backend\python-onnx\models"
+$tauriModelsDir = "$projectRoot\frontend\src-tauri\models"
+if (Test-Path $modelsDir) {
+    # Remove existing models directory in Tauri
+    if (Test-Path $tauriModelsDir) {
+        Remove-Item $tauriModelsDir -Recurse -Force
+    }
+    # Copy models directory
+    Copy-Item -Path $modelsDir -Destination $tauriModelsDir -Recurse -Force
+    Write-Host "Models directory copied to Tauri directory." -ForegroundColor Green
+} else {
+    Write-Host "Warning: Models directory not found at $modelsDir" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "Step 4: Building Tauri application..." -ForegroundColor Yellow
 Set-Location $projectRoot\frontend
@@ -90,6 +105,19 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Build completed successfully!" -ForegroundColor Green
 Write-Host "The executable can be found in: frontend\src-tauri\target\release\" -ForegroundColor Cyan
+
+# Copy models to target/release/models for build time
+$tauriTargetReleaseDir = "$projectRoot\frontend\src-tauri\target\release"
+$tauriTargetModelsDir = "$tauriTargetReleaseDir\models"
+if (Test-Path $tauriTargetReleaseDir) {
+    # Remove existing models directory in target
+    if (Test-Path $tauriTargetModelsDir) {
+        Remove-Item $tauriTargetModelsDir -Recurse -Force
+    }
+    # Copy models directory
+    Copy-Item -Path $modelsDir -Destination $tauriTargetModelsDir -Recurse -Force
+    Write-Host "Models directory copied to Tauri target release directory." -ForegroundColor Green
+}
 
 # Return to project root
 Set-Location $projectRoot

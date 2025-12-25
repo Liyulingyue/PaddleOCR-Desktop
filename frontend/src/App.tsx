@@ -4,6 +4,7 @@ import OCRV5Page from './pages/OCRV5Page'
 import HeaderBar from './components/HeaderBar'
 import { TauriCloseHandler } from './components/TauriCloseHandler'
 import { BackendLogPanel } from './components/BackendLogPanel'
+import { FrontendLogPanel } from './components/FrontendLogPanel'
 import './styles/base.css'
 import './styles/layout.css'
 import './styles/header.css'
@@ -19,6 +20,7 @@ function App() {
       <HeaderBar />
       <TauriCloseHandler />
       <BackendLogPanel />
+      <FrontendLogPanel />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/ocrv5" element={<OCRV5Page />} />

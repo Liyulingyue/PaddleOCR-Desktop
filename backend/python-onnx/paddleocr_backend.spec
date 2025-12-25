@@ -7,7 +7,6 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('models', 'models'),
         ('app', 'app'),
     ],
     hiddenimports=[
