@@ -36,6 +36,14 @@
       "icons/icon.ico"
     ],
     "resources": [],
-    "externalBin": []
+    "copyright": "",
+    "category": "Productivity",
+    "shortDescription": "PaddleOCR Desktop Application",
+    "longDescription": "Desktop application for PaddleOCR with OCR capabilities",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
   }
 }

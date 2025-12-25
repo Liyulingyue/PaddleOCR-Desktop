@@ -1,9 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 
 /**
+ * 检测是否在 Tauri 环境中
+ */
+export const isTauri = () => {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+};
+
+/**
  * 获取API基础URL
  * 在开发环境中，API通过代理转发
- * 在生产环境中，通过Tauri启动后端并获取端口
+ * 在生产环境中，通过Tauri获取后端URL
  */
 export const getApiBaseUrl = async (): Promise<string> => {
   // 在开发环境中使用代理
@@ -11,15 +18,24 @@ export const getApiBaseUrl = async (): Promise<string> => {
     return window.location.origin;
   }
 
-  // 在生产环境中，通过Tauri命令启动后端并获取端口
-  try {
-    const port: number = await invoke('start_backend');
-    return `http://localhost:${port}`;
-  } catch (error) {
-    console.error('Failed to start backend via Tauri:', error);
-    // 降级到端口扫描方案
-    return await fallbackPortDiscovery();
+  // 在Tauri环境中，通过invoke获取后端URL
+  if (isTauri()) {
+    try {
+      // 首先尝试启动后端（如果还没启动）
+      await invoke('start_backend');
+
+      // 然后获取后端URL
+      const backendUrl: string = await invoke('get_backend_url');
+      return backendUrl;
+    } catch (error) {
+      console.error('Failed to get backend URL via Tauri:', error);
+      // 降级到默认URL
+      return 'http://127.0.0.1:8000';
+    }
   }
+
+  // Web环境下的降级方案
+  return await fallbackPortDiscovery();
 };
 
 // 降级方案：扫描端口

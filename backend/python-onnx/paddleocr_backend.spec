@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['run_production.py'],
+    ['run_tauri.py'],
     pathex=[],
     binaries=[],
     datas=[
