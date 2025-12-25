@@ -90,3 +90,6 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Build completed successfully!" -ForegroundColor Green
 Write-Host "The executable can be found in: frontend\src-tauri\target\release\" -ForegroundColor Cyan
+
+# Return to project root
+Set-Location $projectRoot
