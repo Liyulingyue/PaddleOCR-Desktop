@@ -46,3 +46,8 @@ venv/
 # ppocrv4_mobile_det.onnx
 # ppocrv4_mobile_rec.onnx
 models/
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/target/

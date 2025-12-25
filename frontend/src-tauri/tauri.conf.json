@@ -1,42 +1,12 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-  "build": {
-    "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:3000",
-    "distDir": "../dist"
-  },
   "package": {
     "productName": "PaddleOCR Desktop",
     "version": "1.0.0"
   },
   "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true,
-        "sidecar": true,
-        "scope": [
-          { "name": "paddleocr_backend", "sidecar": true }
-        ]
-      },
-      "http": {
-        "all": false,
-        "request": true,
-        "scope": ["http://**", "https://**"]
-      },
-      "window": {
-        "all": false,
-        "close": true
-      }
-    },
     "bundle": {
       "active": true,
-      "category": "Productivity",
-      "externalBin": [
-        "binaries/paddleocr_backend"
-      ],
+      "identifier": "com.paddleocr.app",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -44,31 +14,59 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.paddleocr.app",
-      "resources": [],
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+      "externalBin": [
+        "binaries/paddleocr_backend"
+      ],
+      "category": "Productivity",
+      "shortDescription": "",
+      "longDescription": "",
+      "targets": "all"
+    },
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true,
+        "sidecar": true,
+        "scope": [
+          {
+            "name": "paddleocr_backend",
+            "sidecar": true
+          }
+        ]
+      },
+      "http": {
+        "all": false,
+        "request": true,
+        "scope": [
+          "http://**",
+          "https://**"
+        ]
+      },
+      "window": {
+        "all": false,
+        "close": true
       }
-    },
-    "security": {
-      "csp": null
-    },
-    "updater": {
-      "active": false
     },
     "windows": [
       {
-        "fullscreen": false,
-        "height": 900,
-        "resizable": true,
         "title": "PaddleOCR Desktop",
         "width": 1400,
+        "height": 900,
+        "minWidth": 800,
         "minHeight": 600,
-        "minWidth": 800
+        "resizable": true,
+        "fullscreen": false
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "build": {
+    "distDir": "../dist",
+    "devPath": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
   }
 }

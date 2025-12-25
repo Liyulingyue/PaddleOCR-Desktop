@@ -3,6 +3,7 @@
 
 use tauri::{Manager, api::process::{Command, CommandEvent, CommandChild}};
 use std::sync::{Arc, Mutex};
+use std::io::Write;
 
 struct AppState {
     backend_port: Arc<Mutex<Option<u16>>>,
@@ -76,6 +77,30 @@ fn parse_port_from_line(line: &str) -> Option<u16> {
     None
 }
 
+// 将日志追加到磁盘，并可选地推送到前端
+fn append_log_message_and_emit(app_handle: Option<tauri::AppHandle>, msg: &str) {
+    // 追加到文件
+    if let Some(mut data_dir) = dirs::data_local_dir() {
+        data_dir.push("PaddleOCRDesktop");
+        let _ = std::fs::create_dir_all(&data_dir);
+        data_dir.push("logs");
+        let _ = std::fs::create_dir_all(&data_dir);
+        data_dir.push("app.log");
+        let now = std::time::SystemTime::now();
+        let timestamp = match now.duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => format!("{}", d.as_secs()),
+            Err(_) => "0".to_string(),
+        };
+        let entry = format!("{} {}\n", timestamp, msg);
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&data_dir).and_then(|mut f| f.write_all(entry.as_bytes()));
+    }
+
+    // 发事件到前端
+    if let Some(app) = app_handle {
+        let _ = app.emit_all("backend-log", msg.to_string());
+    }
+}
+
 // 清理 PyInstaller 临时文件
 fn cleanup_pyinstaller_temp() {
     #[cfg(target_os = "windows")]
@@ -123,13 +148,12 @@ fn cleanup_pyinstaller_temp() {
 
 // 清理函数：清理后端状态并终止后端进程
 fn cleanup_backend(app_handle: &tauri::AppHandle) {
-    #[cfg(debug_assertions)]
-    println!("🔴 应用关闭中,终止后端进程...");
+    append_log_message_and_emit(Some(app_handle.clone()), "🔴 应用关闭中,终止后端进程...");
 
     let state: tauri::State<AppState> = app_handle.state();
     let mut backend_child = state.backend_child.lock().unwrap();
 
-    if let Some(mut child) = backend_child.take() {
+    if let Some(child) = backend_child.take() {
         #[cfg(debug_assertions)]
         println!("🔴 正在杀死后端进程及其子进程...");
 
@@ -235,10 +259,10 @@ pub fn run() {
                             let backend_child_arc = state.backend_child.clone();
                             *backend_child_arc.lock().unwrap() = Some(child);
 
-                            #[cfg(debug_assertions)]
-                            println!("✅ 后端进程已启动并保存句柄");
-                            #[cfg(debug_assertions)]
-                            println!("[调试] 开始监听后端输出...");
+                            // 将 app_handle 克隆给异步任务用于 emit
+                            let app_handle_for_events = app_handle.clone();
+
+                            append_log_message_and_emit(Some(app_handle.clone()), "✅ 后端进程已启动并保存句柄");
 
                             // 为异步任务克隆一份
                             let backend_port_async = backend_port.clone();
@@ -246,48 +270,40 @@ pub fn run() {
                             // 异步读取后端输出
                             tauri::async_runtime::spawn(async move {
                                 let mut port_found = false;
-                                #[cfg(debug_assertions)]
-                                println!("[调试] 异步任务已启动,开始接收后端事件");
+                                append_log_message_and_emit(Some(app_handle_for_events.clone()), "[调试] 异步任务已启动,开始接收后端事件");
 
                                 while let Some(event) = rx.recv().await {
                                     match event {
                                         CommandEvent::Stdout(line) => {
-                                            // 始终打印后端输出（用于调试）
-                                            println!("[后端] {}", line);
+                                            // 写日志并推送到前端
+                                            append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端 stdout] {}", line));
 
                                             // 尝试从输出中解析端口号
                                             if !port_found {
-                                                println!("[调试] 尝试从 stdout 解析端口: {}", line);
                                                 if let Some(port) = parse_port_from_line(&line) {
-                                                    println!("✅ 从 stdout 检测到后端端口: {}", port);
+                                                    append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("✅ 从 stdout 检测到后端端口: {}", port));
                                                     *backend_port_async.lock().unwrap() = Some(port);
                                                     port_found = true;
-                                                } else {
-                                                    println!("[调试] 此行未能解析出端口");
                                                 }
                                             }
                                         }
                                         CommandEvent::Stderr(line) => {
-                                            // 始终打印后端错误输出（用于调试）
-                                            eprintln!("[后端错误] {}", line);
+                                            append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端 stderr] {}", line));
 
                                             // 也尝试从 stderr 解析端口(uvicorn 输出在这里)
                                             if !port_found {
-                                                println!("[调试] 尝试从 stderr 解析端口: {}", line);
                                                 if let Some(port) = parse_port_from_line(&line) {
-                                                    println!("✅ 从 stderr 检测到后端端口: {}", port);
+                                                    append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("✅ 从 stderr 检测到后端端口: {}", port));
                                                     *backend_port_async.lock().unwrap() = Some(port);
                                                     port_found = true;
-                                                } else {
-                                                    println!("[调试] 此行未能解析出端口");
                                                 }
                                             }
                                         }
                                         CommandEvent::Error(err) => {
-                                            eprintln!("[后端进程错误] {}", err);
+                                            append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端进程错误] {}", err));
                                         }
                                         CommandEvent::Terminated(payload) => {
-                                            println!("[后端] 进程终止，退出码: {:?}", payload.code);
+                                            append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端] 进程终止，退出码: {:?}", payload.code));
                                         }
                                         _ => {}
                                     }
@@ -295,16 +311,14 @@ pub fn run() {
 
                                 // 如果后端进程退出后仍未获取到端口,尝试从文件读取
                                 if backend_port_async.lock().unwrap().is_none() {
-                                    #[cfg(debug_assertions)]
-                                    println!("后端退出,尝试从文件读取端口信息...");
+                                    append_log_message_and_emit(Some(app_handle_for_events.clone()), "后端退出,尝试从文件读取端口信息...");
                                     if let Some(data_dir) = dirs::data_local_dir() {
                                         let port_file = data_dir.join("PaddleOCRDesktop").join("server_info.json");
                                         if port_file.exists() {
                                             if let Ok(content) = std::fs::read_to_string(&port_file) {
                                                 if let Ok(info) = serde_json::from_str::<serde_json::Value>(&content) {
                                                     if let Some(port) = info["backend_port"].as_u64() {
-                                                        #[cfg(debug_assertions)]
-                                                        println!("✅ 从文件读取到端口: {}", port);
+                                                        append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("✅ 从文件读取到端口: {}", port));
                                                         *backend_port_async.lock().unwrap() = Some(port as u16);
                                                     }
                                                 }
@@ -368,13 +382,13 @@ pub fn run() {
                 _ => {}
             }
         })
-        .invoke_handler(tauri::generate_handler![get_backend_url, start_backend])
+        .invoke_handler(tauri::generate_handler![get_backend_url, start_backend, read_backend_logs])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 #[tauri::command]
-fn start_backend(state: tauri::State<AppState>) -> Result<String, String> {
+fn start_backend(app_handle: tauri::AppHandle, state: tauri::State<AppState>) -> Result<String, String> {
     // 如果已经有后端进程则直接返回
     {
         let backend_child = state.backend_child.lock().unwrap();
@@ -393,13 +407,16 @@ fn start_backend(state: tauri::State<AppState>) -> Result<String, String> {
                 // 保存句柄
                 *backend_child_arc.lock().unwrap() = Some(child);
 
+                append_log_message_and_emit(Some(app_handle.clone()), "start_backend: sidecar started");
+
                 // 异步监听输出，尝试解析端口
+                let app_handle_for_events = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     let mut port_found = false;
                     while let Some(event) = rx.recv().await {
                         match event {
                             CommandEvent::Stdout(line) => {
-                                println!("[后端] {}", line);
+                                append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端] {}", line));
                                 if !port_found {
                                     if let Some(port) = parse_port_from_line(&line) {
                                         *backend_port_arc.lock().unwrap() = Some(port);
@@ -408,7 +425,7 @@ fn start_backend(state: tauri::State<AppState>) -> Result<String, String> {
                                 }
                             }
                             CommandEvent::Stderr(line) => {
-                                eprintln!("[后端错误] {}", line);
+                                append_log_message_and_emit(Some(app_handle_for_events.clone()), &format!("[后端错误] {}", line));
                                 if !port_found {
                                     if let Some(port) = parse_port_from_line(&line) {
                                         *backend_port_arc.lock().unwrap() = Some(port);
@@ -423,26 +440,48 @@ fn start_backend(state: tauri::State<AppState>) -> Result<String, String> {
 
                 Ok("started".into())
             }
-            Err(e) => Err(format!("spawn failed: {}", e)),
+            Err(e) => {
+                append_log_message_and_emit(Some(app_handle.clone()), &format!("spawn failed: {}", e));
+                Err(format!("spawn failed: {}", e))
+            }
         },
-        Err(e) => Err(format!("create failed: {}", e)),
+        Err(e) => {
+            append_log_message_and_emit(Some(app_handle.clone()), &format!("create failed: {}", e));
+            Err(format!("create failed: {}", e))
+        },
     }
 }
 
 #[tauri::command]
 fn get_backend_url(state: tauri::State<AppState>) -> String {
-    println!("[调试] get_backend_url 被调用");
+    append_log_message_and_emit(None, "[调试] get_backend_url 被调用");
     let port = state.backend_port.lock().unwrap();
-    println!("[调试] 当前后端端口状态: {:?}", *port);
+    append_log_message_and_emit(None, &format!("[调试] 当前后端端口状态: {:?}", *port));
     match *port {
         Some(p) => {
-            println!("✅ 返回后端地址: http://127.0.0.1:{}", p);
+            append_log_message_and_emit(None, &format!("✅ 返回后端地址: http://127.0.0.1:{}", p));
             format!("http://127.0.0.1:{}", p)
         },
         None => {
-            println!("⚠️  后端端口未设置，使用默认地址 http://localhost:8002");
+            append_log_message_and_emit(None, "⚠️  后端端口未设置，使用默认地址 http://localhost:8002");
             "http://localhost:8002".to_string()
         }
+    }
+}
+
+// 读取磁盘日志内容, 返回字符串
+#[tauri::command]
+fn read_backend_logs() -> Result<String, String> {
+    if let Some(mut data_dir) = dirs::data_local_dir() {
+        data_dir.push("PaddleOCRDesktop");
+        data_dir.push("logs");
+        data_dir.push("app.log");
+        match std::fs::read_to_string(&data_dir) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(format!("read failed: {}", e)),
+        }
+    } else {
+        Err("no data dir".into())
     }
 }
 
