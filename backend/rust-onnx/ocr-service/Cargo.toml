@@ -1,0 +1,23 @@
+[package]
+name = "ocr-service"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4"
+actix-multipart = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = "0.25"
+imageproc = "0.25"
+env_logger = "0.10"
+base64 = "0.21"
+futures = "0.3"
+# Use the local oar-ocr crate (optional - enable feature "with-ocr" to compile with OAR OCR integration)
+oar-ocr = { path = "../oar-ocr", optional = true }
+actix-rt = "2"
+
+[features]
+with-ocr = ["oar-ocr"]
+
+# Optional: add features or extras here if needed
