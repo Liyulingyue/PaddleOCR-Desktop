@@ -33,6 +33,13 @@ function OCRV5Page() {
     fetchApiUrl()
   }, [])
 
+  // 自动清除全局消息（例如：加载/卸载提示）
+  useEffect(() => {
+    if (!message) return
+    const timer = setTimeout(() => setMessage(null), 1000)
+    return () => clearTimeout(timer)
+  }, [message, setMessage])
+
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
     setResult(null)
@@ -134,6 +141,8 @@ function OCRV5Page() {
         config={config}
         onConfigChange={handleConfigChange}
         onShowApiModal={() => setShowApiModal(true)}
+        apiBaseUrl={apiBaseUrl}
+        onMessage={setMessage}
       />
 
       <Viewer file={file} />
@@ -220,6 +229,65 @@ function OCRV5Page() {
               </div>
 
               <div className="api-section">
+                <h4>⚙️ 模型状态接口</h4>
+                <div className="api-endpoint">
+                  <code className="method">POST</code>
+                  <code className="endpoint">/api/ocr/load</code>
+                </div>
+                <div className="api-params">
+                  <h5>说明：</h5>
+                  <ul>
+                    <li>强制加载 OCR 模型（如果尚未加载）。返回成功或错误信息。</li>
+                  </ul>
+                  <h5>示例（curl）：</h5>
+                  <pre>{`curl -X POST ${apiBaseUrl}/api/ocr/load`}</pre>
+                </div>
+
+                <div className="api-endpoint">
+                  <code className="method">POST</code>
+                  <code className="endpoint">/api/ocr/unload</code>
+                </div>
+                <div className="api-params">
+                  <h5>说明：</h5>
+                  <ul>
+                    <li>卸载 OCR 模型并尝试释放资源（会将内存中的模型实例置空）。</li>
+                  </ul>
+                  <h5>示例（curl）：</h5>
+                  <pre>{`curl -X POST ${apiBaseUrl}/api/ocr/unload`}</pre>
+                </div>
+
+                <div className="api-endpoint">
+                  <code className="method">GET</code>
+                  <code className="endpoint">/api/ocr/model_status</code>
+                </div>
+                <div className="api-params">
+                  <h5>说明：</h5>
+                  <ul>
+                    <li>查询模型是否已加载，返回 JSON: <code>{`{ "loaded": true }`}</code> 或 <code>{`{ "loaded": false }`}</code></li>
+                  </ul>
+                  <h5>示例（curl）：</h5>
+                  <pre>{`curl ${apiBaseUrl}/api/ocr/model_status`}</pre>
+
+                  <h5>示例（JavaScript / fetch）：</h5>
+                  <pre>{`// 查询模型状态
+fetch("${apiBaseUrl}/api/ocr/model_status")
+  .then(res => res.json())
+  .then(j => console.log('loaded:', j.loaded))
+  .catch(err => console.error(err))
+
+// 加载模型
+fetch("${apiBaseUrl}/api/ocr/load", { method: 'POST' })
+  .then(res => res.ok ? console.log('加载成功') : res.text().then(t => console.error(t)))
+  .catch(err => console.error(err))
+
+// 卸载模型
+fetch("${apiBaseUrl}/api/ocr/unload", { method: 'POST' })
+  .then(res => res.ok ? console.log('卸载成功') : res.text().then(t => console.error(t)))
+  .catch(err => console.error(err))`}</pre>
+                </div>
+              </div>
+
+              <div className="api-section">
                 <h4>�🐍 Python 调用示例</h4>
                 <div className="code-example">
                   <pre>{`import requests
@@ -290,6 +358,36 @@ def ocr_result_to_text(ocr_result, api_base_url="${apiBaseUrl}"):
         print(f"错误: {response.status_code}, {response.text}")
         return None
 
+# 模型加载 / 卸载 / 查询 示例
+def load_model(api_base_url="${apiBaseUrl}"):
+    url = f"{api_base_url}/api/ocr/load"
+    resp = requests.post(url)
+    if resp.ok:
+        print("模型加载成功")
+    else:
+        print("模型加载失败:", resp.status_code, resp.text)
+
+
+def unload_model(api_base_url="${apiBaseUrl}"):
+    url = f"{api_base_url}/api/ocr/unload"
+    resp = requests.post(url)
+    if resp.ok:
+        print("模型卸载成功")
+    else:
+        print("模型卸载失败:", resp.status_code, resp.text)
+
+
+def model_status(api_base_url="${apiBaseUrl}"):
+    url = f"{api_base_url}/api/ocr/model_status"
+    resp = requests.get(url)
+    if resp.ok:
+        j = resp.json()
+        print("loaded:", j.get('loaded'))
+        return j.get('loaded')
+    else:
+        print("查询失败:", resp.status_code, resp.text)
+        return None
+
 # 使用示例
 if __name__ == "__main__":
     # 识别图片文件
@@ -301,6 +399,15 @@ if __name__ == "__main__":
     if text_result:
         print("提取的文本:", text_result['text'])
     
+    # 模型控制示例
+    print("模型状态:", model_status())
+    print("正在加载模型...")
+    load_model()
+    print("模型状态:", model_status())
+    print("正在卸载模型...")
+    unload_model()
+    print("模型状态:", model_status())
+
     # 识别PDF文件
     pdf_result = ocr_file("document.pdf")
     print("PDF OCR结果:", json.dumps(pdf_result, indent=2, ensure_ascii=False))

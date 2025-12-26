@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import FileUpload from './FileUpload'
 
 interface SidebarProps {
@@ -21,17 +21,135 @@ interface SidebarProps {
     useCls: boolean
   }) => void
   onShowApiModal: () => void
+  apiBaseUrl?: string
+  onMessage?: (msg: string) => void
 }
 
-function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal }: SidebarProps) {
+function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = 'http://localhost:8000', onMessage }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [drawConfigExpanded, setDrawConfigExpanded] = useState(false)
+
+  // Model status panel
+  const [modelExpanded, setModelExpanded] = useState(false)
+  const [modelLoaded, setModelLoaded] = useState<boolean | null>(null)
+  const [modelActionLoading, setModelActionLoading] = useState(false)
+
+  const showMsg = (m: string) => {
+    if (onMessage) onMessage(m)
+    else console.info(m)
+  }
+
+  const fetchModelStatus = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/ocr/model_status`)
+      if (res.ok) {
+        const j = await res.json()
+        setModelLoaded(Boolean(j.loaded))
+        return j.loaded
+      } else {
+        const t = await res.text()
+        showMsg(`查询模型状态失败: ${res.status} ${t}`)
+      }
+    } catch (err) {
+      showMsg('查询模型状态失败：网络错误')
+    }
+    setModelLoaded(null)
+    return null
+  }
+
+  const loadModel = async () => {
+    setModelActionLoading(true)
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/ocr/load`, { method: 'POST' })
+      if (res.ok) {
+        showMsg('模型加载完成')
+        setModelLoaded(true)
+      } else {
+        const t = await res.text()
+        showMsg(`加载模型失败: ${res.status} ${t}`)
+      }
+    } catch (err) {
+      showMsg('加载模型失败：网络错误')
+    } finally {
+      setModelActionLoading(false)
+    }
+  }
+
+  const unloadModel = async () => {
+    setModelActionLoading(true)
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/ocr/unload`, { method: 'POST' })
+      if (res.ok) {
+        showMsg('模型已卸载')
+        setModelLoaded(false)
+      } else {
+        const t = await res.text()
+        showMsg(`卸载模型失败: ${res.status} ${t}`)
+      }
+    } catch (err) {
+      showMsg('卸载模型失败：网络错误')
+    } finally {
+      setModelActionLoading(false)
+    }
+  }
+
+  // 初次展开时查询一次状态
+  const handleModelToggle = async () => {
+    const next = !modelExpanded
+    setModelExpanded(next)
+    if (next && modelLoaded === null) {
+      await fetchModelStatus()
+    }
+  }
+
+  // 自动在组件挂载时预加载当前状态
+  useEffect(() => {
+    fetchModelStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <aside className="control-bar">
       <div className="control-bar-header">
         <h3>控制板</h3>
       </div>
       <FileUpload onFileSelect={onFileSelect} />
+
+      <div className="control-section">
+        <div 
+          className="config-section-header"
+          onClick={() => handleModelToggle()}
+        >
+          <h4>模型加载状态</h4>
+          <span className={`expand-icon ${modelExpanded ? 'expanded' : ''}`}>▼</span>
+        </div>
+        {modelExpanded && (
+          <div className="config-content">
+            <div className="config-item model-status">
+              <div className="model-status-row">
+                <div className="model-status-left">
+                  <label>当前状态：</label>
+                  <span className={modelLoaded ? 'status-loaded' : modelLoaded === false ? 'status-unloaded' : 'status-unknown'}>
+                    {modelLoaded === true ? '已加载' : modelLoaded === false ? '未加载' : '未知'}
+                  </span>
+                </div>
+                <div className="model-status-right">
+                  <button className="control-btn small refresh-btn" onClick={() => fetchModelStatus()}>刷新</button>
+                </div>
+              </div>
+
+              <div className="model-controls row">
+                <button onClick={loadModel} disabled={modelActionLoading || modelLoaded === true} className="control-btn primary-btn">
+                  {modelActionLoading ? '处理中...' : '加载模型'}
+                </button>
+                <button onClick={unloadModel} disabled={modelActionLoading || modelLoaded === false} className="control-btn secondary-btn">
+                  卸载模型
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="control-section">
         <div 

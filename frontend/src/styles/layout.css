@@ -52,12 +52,24 @@
   backdrop-filter: blur(10px);
 }
 
-.control-bar-header h3 {
-  margin: 0 0 16px 0;
-  color: #333;
-  font-size: 1.4rem;
-  font-weight: 700;
+.control-bar-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  /* 与其他面板标题的下划线保持水平对齐：向上位移 20px，抵消父容器的 top padding */
+  margin-top: -20px;
 }
+
+.control-bar-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+} 
 
 .control-bar .recent ul {
   list-style: none;
@@ -87,6 +99,77 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+/* 模型状态样式 */
+.model-status .status-loaded {
+  color: #2e7d32; /* green */
+  font-weight: 600;
+}
+.model-status .status-unloaded {
+  color: #c62828; /* red */
+  font-weight: 600;
+}
+.model-status .status-unknown {
+  color: #666;
+  font-weight: 600;
+}
+
+.model-status .model-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* status left, refresh right */
+  gap: 8px;
+  min-height: 36px; /* 使行高一致并居中 */
+}
+.model-status .model-status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.model-status .model-status-left label {
+  min-width: 72px;
+  color: #333;
+  font-weight: 600;
+  line-height: 1; /* 行高统一 */
+  display: inline-flex;
+  align-items: center;
+}
+.model-status .model-status-left span {
+  line-height: 1; /* 与 label 对齐 */
+  display: inline-flex;
+  align-items: center;
+  font-size: 1rem;
+}
+.model-status .model-status-right {
+  display: flex;
+  align-items: center;
+}
+.model-status .refresh-btn {
+  /* keep small size for refresh */
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* 小按钮样式 */
+.control-btn.small {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.model-controls {
+  display: flex;
+  flex-direction: row; /* 改为同行 */
+  gap: 8px;
+  margin-top: 10px;
+}
+.model-controls .control-btn {
+  width: auto; /* 由 flex 决定 */
+  flex: 1; /* 等宽分布 */
+}
 .control-btn {
   width: 100%;
   margin-bottom: 8px;

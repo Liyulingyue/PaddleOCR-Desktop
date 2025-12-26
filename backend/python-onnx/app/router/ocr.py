@@ -4,7 +4,7 @@ from PIL import Image
 import io
 import json
 import numpy as np
-from ..deps import get_model
+from ..deps import get_model, unload_model, is_model_loaded
 from ..core.utils import draw_ocr
 
 try:
@@ -249,3 +249,33 @@ async def ocr_result_to_text(ocr_result: dict = Body(...)):
                 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"文本提取失败: {str(e)}"})
+
+
+@router.post("/load")
+async def load_model():
+    """Load the OCR model."""
+    try:
+        model = get_model()  # This will load if not already loaded
+        return {"message": "OCR model loaded successfully"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to load model: {str(e)}"})
+
+
+@router.post("/unload")
+async def unload_model_endpoint():
+    """Unload the OCR model."""
+    try:
+        unload_model()
+        return {"message": "OCR model unloaded successfully"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to unload model: {str(e)}"})
+
+
+@router.get("/model_status")
+async def model_status():
+    """Return whether model is loaded."""
+    try:
+        loaded = is_model_loaded()
+        return {"loaded": bool(loaded)}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to get model status: {str(e)}"})

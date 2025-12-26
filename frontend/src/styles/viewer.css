@@ -31,6 +31,7 @@
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.9);
   align-items: center;
+  min-height: 56px;
 }
 
 .viewer-toolbar h3 {
@@ -38,6 +39,7 @@
   color: #333;
   font-size: 1.2rem;
   font-weight: 600;
+  line-height: 1;
 }
 
 .viewer-controls {
@@ -50,6 +52,10 @@
   padding: 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
 }
 
 .viewer-header h3 {
