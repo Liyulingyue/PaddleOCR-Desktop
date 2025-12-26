@@ -1,3 +1,0 @@
-[submodule "backend/rust-onnx/oar-ocr"]
-	path = backend/rust-onnx/oar-ocr
-	url = https://github.com/GreatV/oar-ocr.git
