@@ -1,4 +1,25 @@
-﻿Model,Status,Error
-PP-LCNet_x1_0_doc_ori,Success,
-UVDoc,Success,
-PP-DocLayout-L,Success,
+Model,Status,Error
+PP-LCNet_x1_0_doc_ori,Skipped,Already converted
+UVDoc,Skipped,Already converted
+PP-DocLayout-L,Skipped,Already converted
+PP-DocLayout-M,Skipped,Already converted
+PP-DocLayout-S,Skipped,Already converted
+PicoDet_layout_1x_table,Skipped,Already converted
+PicoDet-S_layout_3cls,Skipped,Already converted
+PicoDet-S_layout_17cls,Skipped,Already converted
+PicoDet_layout_1x,Skipped,Already converted
+PP-OCRv5_det,Skipped,Already converted
+PP-OCRv5_rec,Skipped,Already converted
+RT-DETR-L_wired_table_cell_det,Skipped,Already converted
+RT-DETR-L_wireless_table_cell_det,Skipped,Already converted
+SLANeXt_wired,Skipped,Already converted
+SLANeXt_wireless,Skipped,Already converted
+PP-FormulaNet-S,Skipped,Already converted
+PP-FormulaNet-L,Skipped,Already converted
+PP-FormulaNet_plus-M,Skipped,Already converted
+PP-FormulaNet_plus-L,Skipped,Already converted
+PP-Chart2Table,Failed,Conversion command failed
+PP-DocBlockLayout,Skipped,Already converted
+PP-DocLayout_plus-L,Skipped,Already converted
+PP-OCRv5_mobile_det,Skipped,Already converted
+PP-OCRv5_mobile_rec,Skipped,Already converted

@@ -5,7 +5,7 @@ set -euo pipefail
 # Usage: bash download_pp_structure_v3_models.sh [TARGET_DIR]
 # Default TARGET_DIR: ./models/pp_structure_v3
 
-TARGET_DIR=${1:-"$(pwd)/models/pp_structure_v3"}
+TARGET_DIR=${1:-"models/pp_structure_v3"}
 mkdir -p "$TARGET_DIR"
 cd "$TARGET_DIR"
 
@@ -69,10 +69,8 @@ for url in "${URLS[@]}"; do
 
   # Try to extract if it's a tar
   if [[ "$filename" == *.tar || "$filename" == *.tar.gz ]]; then
-    # try to find top-level dir inside tar to avoid re-extracting
-    topdir=$(tar -tf "$filename" | head -n1 | cut -d'/' -f1)
-    if [ -n "$topdir" ] && [ -d "$topdir" ]; then
-      echo "  -> $topdir already exists inside archive target, skipping extraction"
+    if [ -d "$expected_dir" ]; then
+      echo "  -> $expected_dir already exists, skipping extraction"
     else
       echo "  -> extracting $filename"
       tar -xf "$filename" || echo "  -> failed to extract $filename"
@@ -80,9 +78,19 @@ for url in "${URLS[@]}"; do
   fi
 done
 
-# write manifest
-MANIFEST="$TARGET_DIR/download_manifest.txt"
-{ echo "Downloaded model packs:"; for url in "${URLS[@]}"; do echo "$url"; done; } > "$MANIFEST"
+echo "Done. See $TARGET_DIR"
 
-echo "Done. See $TARGET_DIR and $MANIFEST"
+# Extract any remaining tar files that weren't extracted
+echo "Checking for any unextracted tar files..."
+for file in *.tar *.tar.gz; do
+  if [[ -f "$file" ]]; then
+    dirname="${file%%.tar}"
+    dirname="${dirname%%.tar.gz}"
+    if [[ ! -d "$dirname" ]]; then
+      echo "Extracting $file"
+      tar -xf "$file" || echo "Failed to extract $file"
+    fi
+  fi
+done
+
 exit 0
