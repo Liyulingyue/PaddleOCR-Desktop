@@ -84,7 +84,7 @@ function OCRV5Page() {
       })
       const data = await response.json()
       if (response.ok) {
-        setResult(data.result)
+        setResult(data.results || data.result)
       } else {
         setError(data.error || '上传失败')
       }

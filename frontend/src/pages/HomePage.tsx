@@ -15,7 +15,7 @@ function HomePage() {
               <button className="primary-btn" onClick={() => navigate('/ocrv5')}>
                 开始OCR识别 (V5)
               </button>
-              <button className="secondary-btn" onClick={() => navigate('/ppstructurev3')}>
+              <button className="primary-btn" onClick={() => navigate('/ppstructurev3')}>
                 PP-Structure V3 布局检测
               </button>
               {/* <button className="secondary-btn" onClick={() => navigate('/ocrv4')}>

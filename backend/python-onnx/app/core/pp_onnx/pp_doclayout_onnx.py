@@ -8,26 +8,29 @@ import numpy as np
 import onnxruntime as ort
 from pathlib import Path
 from typing import List, Dict, Tuple
-import json
 import yaml
 
-class PPDocLayoutONNX:
-    def __init__(self, model_path: str = None):
+from .onnx_model_base import ONNXModelBase
+
+
+class PPDocLayoutONNX(ONNXModelBase):
+    def __init__(self, model_path: str = None, use_gpu: bool = False, gpu_id: int = 0):
         """
         Initialize PP-DocLayout ONNX model
 
         Args:
             model_path: Path to the ONNX model file. If None, uses default path.
+            use_gpu: Whether to use GPU
+            gpu_id: GPU device ID
         """
         if model_path is None:
             # Default path relative to project root
             import os
             project_root = Path(__file__).parent.parent.parent.parent.parent  # backend/python-onnx/app/core -> project root
-            model_path = project_root / 'references' / 'models' / 'pp_structure_v3_onnx' / 'PP-DocLayout-L' / 'inference.onnx'
-            yml_path = model_path.parent / 'inference.yml'
+            model_path = project_root / 'backend' / 'python-onnx' / 'models' / 'pp_structure_v3' / 'PP-DocLayout-L' / 'inference.onnx'
 
         self.model_path = Path(model_path)
-        self.yml_path = Path(yml_path)
+        self.yml_path = self.model_path.parent / 'inference.yml'
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model not found at {self.model_path}")
         if not self.yml_path.exists():
@@ -36,7 +39,7 @@ class PPDocLayoutONNX:
         with open(self.yml_path, 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
 
-        # Extract infomation from config
+        # Extract information from config
         self.label_list = self.config.get('label_list', [])
         self.draw_threshold = self.config.get('draw_threshold', 0.5)
         self.arch = self.config.get('arch', 'Unknown')
@@ -58,10 +61,8 @@ class PPDocLayoutONNX:
         if not self.label_list:
             raise ValueError("No label_list found in inference.yml")
 
-        # Load ONNX model
-        self.session = ort.InferenceSession(str(self.model_path))
-        self.input_names = [input.name for input in self.session.get_inputs()]
-        self.input_shapes = [input.shape for input in self.session.get_inputs()]
+        # Initialize ONNXModelBase
+        super().__init__(model_path=str(self.model_path), use_gpu=use_gpu, gpu_id=gpu_id)
 
         print(f"Loaded {self.model_name} ({self.arch}) model with {len(self.label_list)} classes")
         # print(f"Classes: {self.label_list}")
@@ -86,7 +87,7 @@ class PPDocLayoutONNX:
             'input_shapes': self.input_shapes
         }
 
-    def preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, float, float]:
+    def preprocess(self, image: np.ndarray, **kwargs) -> Dict[str, np.ndarray]:
         """
         Preprocess image for PP-DocLayout model
 
@@ -94,7 +95,7 @@ class PPDocLayoutONNX:
             image: Input image (BGR format)
 
         Returns:
-            Tuple of (processed_image, scale_w, scale_h)
+            Dictionary with preprocessed inputs for ONNX model
         """
         if isinstance(image, str):
             image = cv2.imread(image)
@@ -121,9 +122,16 @@ class PPDocLayoutONNX:
         scale_w = self.target_size[0] / w
         scale_h = self.target_size[1] / h
 
-        return batch_input.astype(np.float32), scale_w, scale_h
+        # Return inputs dict for ONNX model
+        inputs = {
+            'im_shape': np.array([self.target_size], dtype=np.float32),  # [1, 2]
+            'image': batch_input.astype(np.float32),  # [1, 3, H, W]
+            'scale_factor': np.array([[scale_h, scale_w]], dtype=np.float32)  # [1, 2]
+        }
 
-    def postprocess(self, outputs: list, original_size: Tuple[int, int], conf_threshold: float = 0.5) -> List[Dict]:
+        return inputs
+
+    def postprocess(self, outputs: List[np.ndarray], image: np.ndarray, original_size: Tuple[int, int], conf_threshold: float = 0.5) -> List[Dict]:
         """
         Postprocess model outputs to get layout regions
 
@@ -187,20 +195,11 @@ class PPDocLayoutONNX:
         Returns:
             List of detected layout regions
         """
-        # Preprocess
-        processed_image, scale_w, scale_h = self.preprocess(image)
+        # Get original size for postprocessing
         original_size = (image.shape[1], image.shape[0])  # w, h
 
-        # Run inference
-        inputs = {
-            'im_shape': np.array([self.target_size], dtype=np.float32),  # [1, 2]
-            'image': processed_image,  # [1, 3, H, W]
-            'scale_factor': np.array([[scale_h, scale_w]], dtype=np.float32)  # [1, 2]
-        }
-        outputs = self.session.run(None, inputs)
-
-        # Postprocess
-        regions = self.postprocess(outputs, original_size, conf_threshold)
+        # Use ONNXModelBase.run method which handles preprocess -> infer -> postprocess
+        regions = self.run(image, original_size=original_size, conf_threshold=conf_threshold)
 
         return regions
 

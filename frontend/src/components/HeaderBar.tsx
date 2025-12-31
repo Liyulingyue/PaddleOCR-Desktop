@@ -52,6 +52,9 @@ function HeaderBar({
             <Link to="/ocrv5" className="sidebar-link" onClick={closeSidebar}>
               🤖 OCR识别 (V5)
             </Link>
+            <Link to="/ppstructurev3" className="sidebar-link" onClick={closeSidebar}>
+              📄 PP-Structure V3 布局检测
+            </Link>
             {/* <Link to="/ocrv4" className="sidebar-link" onClick={closeSidebar}>
               📷 OCR识别 (V4)
             </Link> */}
