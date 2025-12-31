@@ -5,11 +5,29 @@ interface ResultPanelProps {
   imageFile: File | null
   drawnImage: string | any[] | null
   onMessage: (message: string) => void
+  resultType?: string
 }
 
 // 从OCR结果中提取纯文本
-function extractTextFromResult(result: any): string {
+function extractTextFromResult(result: any, resultType: string = 'ocr'): string {
   if (!result) return ''
+  
+  if (resultType === 'layout') {
+    // 布局检测结果
+    if (Array.isArray(result)) {
+      const layoutLines: string[] = []
+      for (const region of result) {
+        if (region && typeof region === 'object' && 'type' in region && 'bbox' in region) {
+          const bbox = region.bbox
+          const type = region.type
+          const conf = region.confidence ? region.confidence.toFixed(3) : 'N/A'
+          layoutLines.push(`${type}: [${bbox.join(', ')}] (conf: ${conf})`)
+        }
+      }
+      return layoutLines.join('\n')
+    }
+    return ''
+  }
   
   const resultData = result
   const textLines: string[] = []
@@ -48,7 +66,7 @@ function extractTextFromResult(result: any): string {
   return textLines.join('\n')
 }
 
-function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelProps) {
+function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr' }: ResultPanelProps) {
   const [view, setView] = useState<'json' | 'drawn-image' | 'ocr-text'>('json')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -121,7 +139,7 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
       
       if (view === 'ocr-text') {
         // 复制纯文本内容
-        contentToCopy = extractTextFromResult(result)
+        contentToCopy = extractTextFromResult(result, resultType)
       } else {
         // 复制JSON格式的结果
         contentToCopy = JSON.stringify(result || {}, null, 2)
@@ -143,13 +161,13 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
     
     if (view === 'ocr-text') {
       // 下载纯文本内容
-      content = extractTextFromResult(result)
-      filename = 'ocr_result.txt'
+      content = extractTextFromResult(result, resultType)
+      filename = resultType === 'layout' ? 'layout_result.txt' : 'ocr_result.txt'
       mimeType = 'text/plain'
     } else {
       // 下载JSON格式的结果
       content = JSON.stringify(result || {}, null, 2)
-      filename = 'ocr_result.json'
+      filename = resultType === 'layout' ? 'layout_result.json' : 'ocr_result.json'
       mimeType = 'application/json'
     }
     
@@ -180,7 +198,7 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
           >
             <option value="json">JSON</option>
             <option value="drawn-image">绘制图像</option>
-            <option value="ocr-text">纯文本</option>
+            {resultType !== 'layout' && <option value="ocr-text">纯文本</option>}
           </select>
         </div>
       </div>
@@ -191,7 +209,7 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage }: ResultPanelPr
             <pre>{JSON.stringify(result, null, 2)}</pre>
           ) : view === 'ocr-text' ? (
             <div className="ocr-text">
-              <pre>{extractTextFromResult(result)}</pre>
+              <pre>{extractTextFromResult(result, resultType)}</pre>
             </div>
           ) : (
             <div className="drawn-image">

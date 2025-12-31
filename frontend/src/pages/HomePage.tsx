@@ -15,6 +15,9 @@ function HomePage() {
               <button className="primary-btn" onClick={() => navigate('/ocrv5')}>
                 开始OCR识别 (V5)
               </button>
+              <button className="secondary-btn" onClick={() => navigate('/ppstructurev3')}>
+                PP-Structure V3 布局检测
+              </button>
               {/* <button className="secondary-btn" onClick={() => navigate('/ocrv4')}>
                 OCR识别 (V4)
               </button> */}
@@ -29,7 +32,11 @@ function HomePage() {
         <div className="features-grid">
           <div className="feature-card">
             <h3>多模型支持</h3>
-            <p>支持PaddleOCR V4和V5模型，提供高精度识别</p>
+            <p>支持PaddleOCR V4/V5和PP-Structure V3，提供高精度识别和布局检测</p>
+          </div>
+          <div className="feature-card">
+            <h3>布局检测</h3>
+            <p>PP-Structure V3模型支持文档布局分析，识别表格、公式、图像等元素</p>
           </div>
           <div className="feature-card">
             <h3>图像绘制</h3>
@@ -38,10 +45,6 @@ function HomePage() {
           <div className="feature-card">
             <h3>多种格式</h3>
             <p>支持图片和PDF文件，批量处理</p>
-          </div>
-          <div className="feature-card">
-            <h3>实时预览</h3>
-            <p>上传后即时预览和识别结果</p>
           </div>
         </div>
       </div>

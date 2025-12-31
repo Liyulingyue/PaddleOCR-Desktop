@@ -8,24 +8,15 @@ interface SidebarProps {
   error: string | null
   onUpload: () => void
   onClear: () => void
-  config: { 
-    dropScore: number
-    detThresh: number
-    clsThresh: number
-    useCls: boolean
-  }
-  onConfigChange: (config: { 
-    dropScore: number
-    detThresh: number
-    clsThresh: number
-    useCls: boolean
-  }) => void
+  config: any
+  onConfigChange: (config: any) => void
   onShowApiModal: () => void
   apiBaseUrl?: string
   onMessage?: (msg: string) => void
+  pageType?: string
 }
 
-function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = 'http://localhost:8000', onMessage }: SidebarProps) {
+function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = 'http://localhost:8000', onMessage, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [drawConfigExpanded, setDrawConfigExpanded] = useState(false)
 
@@ -156,96 +147,121 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           className="config-section-header"
           onClick={() => setOcrConfigExpanded(!ocrConfigExpanded)}
         >
-          <h4>OCR配置参数</h4>
+          <h4>{pageType === 'ppstructure' ? '布局检测配置参数' : 'OCR配置参数'}</h4>
           <span className={`expand-icon ${ocrConfigExpanded ? 'expanded' : ''}`}>▼</span>
         </div>
         {ocrConfigExpanded && (
           <div className="config-content">
-            <div className="config-item">
-              <label htmlFor="det-thresh">检测阈值: {config.detThresh}</label>
-              <input
-                id="det-thresh"
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={config.detThresh}
-                onChange={(e) => onConfigChange({ ...config, detThresh: parseFloat(e.target.value) })}
-                disabled={loading}
-              />
-              <div className="range-labels">
-                <span>0.0</span>
-                <span>1.0</span>
-              </div>
-              <small className="config-description">控制文本检测的灵敏度，较低值检测更多文本</small>
-            </div>
-
-            <div className="config-item">
-              <label htmlFor="cls-thresh">分类阈值: {config.clsThresh}</label>
-              <input
-                id="cls-thresh"
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={config.clsThresh}
-                onChange={(e) => onConfigChange({ ...config, clsThresh: parseFloat(e.target.value) })}
-                disabled={loading || !config.useCls}
-              />
-              <div className="range-labels">
-                <span>0.0</span>
-                <span>1.0</span>
-              </div>
-              <small className="config-description">控制文本方向分类的置信度阈值</small>
-            </div>
-
-            <div className="config-item">
-              <label className="checkbox-label">
+            {pageType === 'ppstructure' ? (
+              <div className="config-item">
+                <label htmlFor="conf-threshold">置信度阈值: {config.confThreshold}</label>
                 <input
-                  type="checkbox"
-                  checked={config.useCls}
-                  onChange={(e) => onConfigChange({ ...config, useCls: e.target.checked })}
+                  id="conf-threshold"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={config.confThreshold}
+                  onChange={(e) => onConfigChange({ ...config, confThreshold: parseFloat(e.target.value) })}
                   disabled={loading}
                 />
-                启用文本方向分类
-              </label>
-              <small className="config-description">是否执行文本方向检测和矫正</small>
-            </div>
+                <div className="range-labels">
+                  <span>0.0</span>
+                  <span>1.0</span>
+                </div>
+                <small className="config-description">控制布局检测的置信度阈值</small>
+              </div>
+            ) : (
+              <>
+                <div className="config-item">
+                  <label htmlFor="det-thresh">检测阈值: {config.detThresh}</label>
+                  <input
+                    id="det-thresh"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.detThresh}
+                    onChange={(e) => onConfigChange({ ...config, detThresh: parseFloat(e.target.value) })}
+                    disabled={loading}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制文本检测的灵敏度，较低值检测更多文本</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="cls-thresh">分类阈值: {config.clsThresh}</label>
+                  <input
+                    id="cls-thresh"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.clsThresh}
+                    onChange={(e) => onConfigChange({ ...config, clsThresh: parseFloat(e.target.value) })}
+                    disabled={loading || !config.useCls}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制文本方向分类的置信度阈值</small>
+                </div>
+
+                <div className="config-item">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.useCls}
+                      onChange={(e) => onConfigChange({ ...config, useCls: e.target.checked })}
+                      disabled={loading}
+                    />
+                    启用文本方向分类
+                  </label>
+                  <small className="config-description">是否执行文本方向检测和矫正</small>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      <div className="control-section">
-        <div 
-          className="config-section-header"
-          onClick={() => setDrawConfigExpanded(!drawConfigExpanded)}
-        >
-          <h4>绘制配置参数</h4>
-          <span className={`expand-icon ${drawConfigExpanded ? 'expanded' : ''}`}>▼</span>
-        </div>
-        {drawConfigExpanded && (
-          <div className="config-content">
-            <div className="config-item">
-              <label htmlFor="drop-score">绘制阈值: {config.dropScore}</label>
-              <input
-                id="drop-score"
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={config.dropScore}
-                onChange={(e) => onConfigChange({ ...config, dropScore: parseFloat(e.target.value) })}
-                disabled={loading}
-              />
-              <div className="range-labels">
-                <span>0.0</span>
-                <span>1.0</span>
-              </div>
-              <small className="config-description">控制绘制时显示的识别结果最低置信度</small>
-            </div>
+      {pageType !== 'ppstructure' && (
+        <div className="control-section">
+          <div 
+            className="config-section-header"
+            onClick={() => setDrawConfigExpanded(!drawConfigExpanded)}
+          >
+            <h4>绘制配置参数</h4>
+            <span className={`expand-icon ${drawConfigExpanded ? 'expanded' : ''}`}>▼</span>
           </div>
-        )}
-      </div>
+          {drawConfigExpanded && (
+            <div className="config-content">
+              <div className="config-item">
+                <label htmlFor="drop-score">绘制阈值: {config.dropScore}</label>
+                <input
+                  id="drop-score"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={config.dropScore}
+                  onChange={(e) => onConfigChange({ ...config, dropScore: parseFloat(e.target.value) })}
+                  disabled={loading}
+                />
+                <div className="range-labels">
+                  <span>0.0</span>
+                  <span>1.0</span>
+                </div>
+                <small className="config-description">控制绘制时显示的识别结果最低置信度</small>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="control-section">
         <div className="button-group">

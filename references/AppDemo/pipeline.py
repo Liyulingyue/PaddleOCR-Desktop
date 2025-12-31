@@ -45,9 +45,8 @@ class PPStructureONNXPipeline:
         # Add preprocessing steps as needed
         return image
 
-    def run_layout_detection(self, image):
-        """Run layout detection"""
-        if 'layout_det' not in self.models:
+    def run_layout_detection(self, image, min_conf: float = 0.5, nms_iou: float = 0.5, debug: bool = False, shrink: float = 1.0, map_mode: str = 'auto', max_box_ratio: float = 0.9):
+        """Run layout detection with configurable confidence, NMS, shrink factor and mapping mode"""        if 'layout_det' not in self.models:
             return []
 
         # Preprocess for layout model
@@ -64,14 +63,18 @@ class PPStructureONNXPipeline:
             print(f"Inference error: {e}")
             return []
 
-        # Post-process to get layout regions
+        # Post-process to get layout regions (pass thresholds)
         try:
-            regions = self.utils.postprocess_layout(outputs, scale, offset, (image.shape[1], image.shape[0]))
+            regions = self.utils.postprocess_layout(outputs, scale, offset, (image.shape[1], image.shape[0]), conf_threshold=min_conf, iou_threshold=nms_iou, shrink=shrink, map_mode=map_mode, max_box_ratio=max_box_ratio)
         except Exception as e:
             print(f"Postprocessing error: {e}")
             import traceback
             traceback.print_exc()
             return []
+
+        # If debug, attach raw outputs and preprocessing info for further inspection
+        if debug:
+            return regions, outputs, scale, offset
 
         return regions
 
