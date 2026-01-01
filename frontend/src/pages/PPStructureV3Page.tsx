@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
+import { getCachedApiBaseUrl } from '../utils/api'
 
 function PPStructureV3Page() {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<any>(null)
   const [drawnImage, setDrawnImage] = useState<string | null>(null)
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null)
+  const [markdownImageData, setMarkdownImageData] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [config, setConfig] = useState({
@@ -14,6 +17,20 @@ function PPStructureV3Page() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
+
+  // 获取API基础URL
+  useEffect(() => {
+    const fetchApiUrl = async () => {
+      try {
+        const url = await getCachedApiBaseUrl()
+        setApiBaseUrl(url)
+      } catch (error) {
+        console.error('Failed to get API URL:', error)
+      }
+    }
+    fetchApiUrl()
+  }, [])
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
@@ -29,6 +46,8 @@ function PPStructureV3Page() {
     setFile(null)
     setResult(null)
     setDrawnImage(null)
+    setMarkdownContent(null)
+    setMarkdownImageData(null)
     setError(null)
   }
 
@@ -38,26 +57,46 @@ function PPStructureV3Page() {
     setError(null)
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('conf_threshold', config.confThreshold.toString())
+    formData.append('layout_conf_threshold', config.confThreshold.toString())
 
     try {
       // Fetch layout detection result
-      const response = await fetch('http://localhost:8000/api/ppstructure', {
+      const response = await fetch('/api/ppstructure', {
         method: 'POST',
         body: formData,
       })
       const data = await response.json()
       if (response.ok) {
-        setResult(data.result)
+        setResult(data.results)
       } else {
         setError(data.error || '上传失败')
+      }
+
+      // Fetch markdown content
+      const markdownFormData = new FormData()
+      markdownFormData.append('file', file)
+      markdownFormData.append('layout_result', JSON.stringify(data))
+      const markdownResponse = await fetch('/api/ppstructure/markdown', {
+        method: 'POST',
+        body: markdownFormData,
+      })
+      if (markdownResponse.ok) {
+        const markdownData = await markdownResponse.json()
+        console.log('Markdown data received:', markdownData)
+        setMarkdownContent(markdownData.markdown)
+        setMarkdownImageData(null)
+        console.log('Markdown content set:', markdownData.markdown)
+      } else {
+        console.error('Failed to fetch markdown content')
+        setMarkdownContent('# Error\n\nFailed to generate markdown content.')
+        setMarkdownImageData(null)
       }
 
       // Fetch drawn image
       const drawFormData = new FormData()
       drawFormData.append('file', file)
       drawFormData.append('layout_result', JSON.stringify(data))
-      const drawResponse = await fetch('http://localhost:8000/api/ppstructure/draw', {
+      const drawResponse = await fetch('/api/ppstructure/draw', {
         method: 'POST',
         body: drawFormData,
       })
@@ -96,7 +135,7 @@ function PPStructureV3Page() {
         pageType="ppstructure"
       />
       <Viewer file={file} />
-      <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessage} resultType="layout" />
+      <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessage} resultType="layout" viewOptions={['json', 'drawn-image', 'markdown']} markdownContent={markdownContent} markdownImageData={markdownImageData} />
 
       {showApiModal && (
         <div className="api-modal-overlay" onClick={() => setShowApiModal(false)}>
@@ -108,7 +147,7 @@ function PPStructureV3Page() {
             <div className="api-modal-content">
               <div className="api-section">
                 <h4>🔗 接口地址</h4>
-                <code className="api-url">http://localhost:8000</code>
+                <code className="api-url">{apiBaseUrl}</code>
               </div>
 
               <div className="api-section">
@@ -121,7 +160,7 @@ function PPStructureV3Page() {
                   <h5>参数：</h5>
                   <ul>
                     <li><code>file</code>: 上传的图像文件</li>
-                    <li><code>conf_threshold</code>: 置信度阈值 (0.0-1.0，默认: 0.5)</li>
+                    <li><code>layout_conf_threshold</code>: 置信度阈值 (0.0-1.0，默认: 0.5)</li>
                   </ul>
                 </div>
               </div>
@@ -137,6 +176,25 @@ function PPStructureV3Page() {
                   <ul>
                     <li><code>file</code>: 原始图像文件</li>
                     <li><code>layout_result</code>: 布局检测结果的JSON字符串</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="api-section">
+                <h4>📝 Markdown生成接口</h4>
+                <div className="api-endpoint">
+                  <code className="method">POST</code>
+                  <code className="endpoint">/api/ppstructure/markdown</code>
+                </div>
+                <div className="api-params">
+                  <h5>参数：</h5>
+                  <ul>
+                    <li><code>file</code>: 原始图像文件</li>
+                    <li><code>layout_result</code>: 布局检测结果的JSON字符串</li>
+                  </ul>
+                  <h5>返回：</h5>
+                  <ul>
+                    <li><code>markdown</code>: 生成的Markdown文档字符串（包含嵌入的base64图片）</li>
                   </ul>
                 </div>
               </div>

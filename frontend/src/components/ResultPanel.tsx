@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import JSZip from 'jszip'
 
 interface ResultPanelProps {
   result: any
@@ -6,6 +8,9 @@ interface ResultPanelProps {
   drawnImage: string | any[] | null
   onMessage: (message: string) => void
   resultType?: string
+  viewOptions?: string[]
+  markdownContent?: string | null
+  markdownImageData?: string | null
 }
 
 // 从OCR结果中提取纯文本
@@ -29,19 +34,17 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
     return ''
   }
   
-  const resultData = result
   const textLines: string[] = []
   
   // 检查是否为多页PDF结果
-  if (Array.isArray(resultData) && resultData.length > 0 && typeof resultData[0] === 'object' && 'page' in resultData[0]) {
-    // 多页PDF结果
-    for (const pageData of resultData) {
-      const pageResult = pageData.result
-      if (pageResult && Array.isArray(pageResult) && pageResult.length > 0) {
-        // 提取该页的所有文本行
-        for (const line of pageResult[0] || []) {
-          if (Array.isArray(line) && line.length >= 2) {
-            const text = Array.isArray(line[1]) && line[1].length >= 1 ? line[1][0] : ''
+  if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && 'page' in result[0]) {
+    // 多页PDF结果 - pipeline格式
+    for (const pageData of result) {
+      const pageResults = pageData.results
+      if (pageResults && Array.isArray(pageResults)) {
+        for (const item of pageResults) {
+          if (item && typeof item === 'object' && 'text' in item) {
+            const text = item.text
             if (text && text.trim()) {
               textLines.push(text)
             }
@@ -49,15 +52,13 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
         }
       }
     }
-  } else {
-    // 单页图像结果
-    if (Array.isArray(resultData) && resultData.length > 0) {
-      for (const line of resultData[0] || []) {
-        if (Array.isArray(line) && line.length >= 2) {
-          const text = Array.isArray(line[1]) && line[1].length >= 1 ? line[1][0] : ''
-          if (text && text.trim()) {
-            textLines.push(text)
-          }
+  } else if (Array.isArray(result)) {
+    // 单页结果 - pipeline格式
+    for (const item of result) {
+      if (item && typeof item === 'object' && 'text' in item) {
+        const text = item.text
+        if (text && text.trim()) {
+          textLines.push(text)
         }
       }
     }
@@ -66,9 +67,26 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
   return textLines.join('\n')
 }
 
-function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr' }: ResultPanelProps) {
-  const [view, setView] = useState<'json' | 'drawn-image' | 'ocr-text'>('json')
+function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr', viewOptions, markdownContent, markdownImageData }: ResultPanelProps) {
+  const defaultViewOptions = ['json', 'drawn-image']
+  if (resultType !== 'layout') {
+    defaultViewOptions.push('ocr-text')
+  }
+  const availableViews = viewOptions || defaultViewOptions
+  
+  const [view, setView] = useState<string>(availableViews[0])
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // 处理markdown内容，将图片引用替换为实际的data URI
+  const processMarkdownContent = (content: string | null): string => {
+    if (!content || !markdownImageData) return content || ''
+    
+    // 将相对路径的图片引用替换为base64 data URI
+    return content.replace(
+      /\(original_image\.png\)/g, 
+      `(data:image/png;base64,${markdownImageData})`
+    )
+  }
 
   useEffect(() => {
     if (view === 'ocr-text' && imageFile && result && canvasRef.current) {
@@ -86,44 +104,85 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-        // 绘制OCR结果文字（如果有坐标信息）
-        const boxes = result.result?.[0] || []
-        const recRes = result.result?.[1] || []
+        // 绘制OCR结果文字（如果有坐标信息）- 支持pipeline格式
+        let ocrItems: any[] = []
+        
+        // 检查是否为多页PDF结果
+        if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && 'page' in result[0]) {
+          // 多页PDF，取第一页的结果
+          ocrItems = result[0].results || []
+        } else if (Array.isArray(result)) {
+          // 单页结果
+          ocrItems = result
+        }
 
-        if (boxes.length > 0) {
+        if (ocrItems.length > 0) {
           ctx.strokeStyle = '#ff0000'
           ctx.lineWidth = 2
           ctx.fillStyle = '#000000'
 
-          boxes.forEach((box: any, index: number) => {
-            if (Array.isArray(box)) {
-              ctx.beginPath()
-              ctx.moveTo(box[0][0], box[0][1])
-              for (let i = 1; i < box.length; i++) {
-                ctx.lineTo(box[i][0], box[i][1])
-              }
-              ctx.closePath()
-              ctx.stroke()
+          ocrItems.forEach((item: any) => {
+            if (item && typeof item === 'object' && 'box' in item && 'text' in item) {
+              const box = item.box
+              const text = item.text
+              
+              if (Array.isArray(box) && box.length >= 4) {
+                // 绘制边界框
+                ctx.beginPath()
+                if (box.length === 4) {
+                  // 四边形框 [x1,y1,x2,y2,x3,y3,x4,y4]
+                  ctx.moveTo(box[0], box[1])
+                  ctx.lineTo(box[2], box[3])
+                  ctx.lineTo(box[4], box[5])
+                  ctx.lineTo(box[6], box[7])
+                } else if (box.length === 8) {
+                  // 展平的四边形
+                  for (let i = 0; i < box.length; i += 2) {
+                    if (i === 0) {
+                      ctx.moveTo(box[i], box[i + 1])
+                    } else {
+                      ctx.lineTo(box[i], box[i + 1])
+                    }
+                  }
+                }
+                ctx.closePath()
+                ctx.stroke()
 
-              // 在框内绘制文本
-              const recResult = recRes[index]
-              if (recResult && recResult[0]) {
-                const text = recResult[0]
-                // 计算框的中心位置来绘制文字
-                const minX = Math.min(...box.map((c: number[]) => c[0]))
-                const minY = Math.min(...box.map((c: number[]) => c[1]))
-                const maxX = Math.max(...box.map((c: number[]) => c[0]))
-                const maxY = Math.max(...box.map((c: number[]) => c[1]))
-                const centerX = (minX + maxX) / 2
-                const centerY = (minY + maxY) / 2
+                // 在框内绘制文本
+                if (text && text.trim()) {
+                  // 计算框的边界来绘制文字
+                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+                  
+                  if (box.length === 4) {
+                    // 四边形框
+                    for (let i = 0; i < box.length; i += 2) {
+                      minX = Math.min(minX, box[i])
+                      minY = Math.min(minY, box[i + 1])
+                      maxX = Math.max(maxX, box[i])
+                      maxY = Math.max(maxY, box[i + 1])
+                    }
+                  } else if (box.length === 8) {
+                    // 展平的四边形
+                    for (let i = 0; i < box.length; i += 2) {
+                      minX = Math.min(minX, box[i])
+                      minY = Math.min(minY, box[i + 1])
+                      maxX = Math.max(maxX, box[i])
+                      maxY = Math.max(maxY, box[i + 1])
+                    }
+                  }
+                  
+                  const centerX = (minX + maxX) / 2
+                  const centerY = (minY + maxY) / 2
 
-                // 调整字体大小基于框的高度
-                const boxHeight = maxY - minY
-                const fontSize = Math.max(12, Math.min(24, boxHeight * 0.8))
-                ctx.font = `${fontSize}px Arial`
-                ctx.textAlign = 'center'
-                ctx.textBaseline = 'middle'
-                ctx.fillText(text, centerX, centerY)
+                  // 调整字体大小基于框的高度
+                  const boxHeight = maxY - minY
+                  const fontSize = Math.max(12, Math.min(24, boxHeight * 0.8))
+                  ctx.font = `${fontSize}px Arial`
+                  ctx.textAlign = 'center'
+                  ctx.textBaseline = 'middle'
+                  
+                  ctx.fillText(text, centerX, centerY)
+                }
               }
             }
           })
@@ -136,18 +195,33 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
   const copyResult = async () => {
     try {
       let contentToCopy: string
+      let contentType: string
       
       if (view === 'ocr-text') {
         // 复制纯文本内容
         contentToCopy = extractTextFromResult(result, resultType)
+        contentType = '纯文本'
+      } else if (view === 'markdown') {
+        // 复制markdown内容
+        contentToCopy = markdownContent || 'No markdown content available'
+        contentType = 'Markdown'
+        if (!markdownContent) {
+          onMessage('警告：Markdown内容为空，将复制占位符文本')
+        }
+      } else if (view === 'drawn-image') {
+        // 图像视图无法复制到剪贴板
+        onMessage('图像无法复制到剪贴板，请使用下载功能保存图像')
+        setTimeout(() => onMessage(''), 3000)
+        return
       } else {
         // 复制JSON格式的结果
         contentToCopy = JSON.stringify(result || {}, null, 2)
+        contentType = 'JSON'
       }
       
       await navigator.clipboard.writeText(contentToCopy)
-      onMessage('已复制到剪贴板')
-      setTimeout(() => onMessage(''), 2000) // 2秒后自动隐藏
+      onMessage(`已复制${contentType}内容到剪贴板`)
+      setTimeout(() => onMessage(''), 3000) // 3秒后自动隐藏
     } catch (e) {
       onMessage('复制失败')
       setTimeout(() => onMessage(''), 2000)
@@ -158,17 +232,80 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
     let content: string
     let filename: string
     let mimeType: string
+    let contentType: string
     
     if (view === 'ocr-text') {
       // 下载纯文本内容
       content = extractTextFromResult(result, resultType)
       filename = resultType === 'layout' ? 'layout_result.txt' : 'ocr_result.txt'
       mimeType = 'text/plain'
+      contentType = '纯文本'
+    } else if (view === 'markdown') {
+      // 下载markdown内容和图片的压缩包
+      const zip = new JSZip()
+      
+      // 添加markdown文件
+      const mdContent = markdownContent || '# Error\n\nNo markdown content available'
+      zip.file('document.md', mdContent)
+      
+      // 提取并添加base64图片
+      const imageRegex = /!\[.*?\]\(data:image\/png;base64,([^)]+)\)/g
+      let match
+      let imageIndex = 1
+      while ((match = imageRegex.exec(mdContent)) !== null) {
+        const base64Data = match[1]
+        const imageBlob = new Blob(
+          [Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], 
+          { type: 'image/png' }
+        )
+        zip.file(`image_${imageIndex}.png`, imageBlob)
+        imageIndex++
+      }
+      
+      // 生成并下载压缩包
+      zip.generateAsync({ type: 'blob' }).then((content) => {
+        const url = URL.createObjectURL(content)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'document_with_images.zip'
+        a.click()
+        URL.revokeObjectURL(url)
+        onMessage('已下载Markdown文档和图片压缩包')
+        setTimeout(() => onMessage(''), 3000)
+      })
+      return
+      // 下载绘制图像
+      // 对于drawn-image视图，如果有图片URL，我们需要下载图片
+      if (drawnImage && typeof drawnImage === 'string') {
+        // 单张图片，直接下载
+        const a = document.createElement('a')
+        a.href = drawnImage as string
+        a.download = resultType === 'layout' ? 'layout_visualization.png' : 'ocr_visualization.png'
+        a.click()
+        onMessage('已下载图像文件')
+        setTimeout(() => onMessage(''), 3000)
+        return
+      } else if (drawnImage && Array.isArray(drawnImage) && drawnImage!.length > 0) {
+        // 多页PDF图片，下载第一页作为示例
+        const a = document.createElement('a')
+        a.href = (drawnImage as any[])[0]?.image || ''
+        a.download = 'document_visualization_page1.png'
+        a.click()
+        onMessage('已下载第一页图像文件')
+        setTimeout(() => onMessage(''), 3000)
+        return
+      }
+      // 如果没有图片，回退到JSON
+      content = JSON.stringify(result || {}, null, 2)
+      filename = resultType === 'layout' ? 'layout_result.json' : 'ocr_result.json'
+      mimeType = 'application/json'
+      contentType = 'JSON'
     } else {
       // 下载JSON格式的结果
       content = JSON.stringify(result || {}, null, 2)
       filename = resultType === 'layout' ? 'layout_result.json' : 'ocr_result.json'
       mimeType = 'application/json'
+      contentType = 'JSON'
     }
     
     const blob = new Blob([content], { type: mimeType })
@@ -178,6 +315,9 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+    
+    onMessage(`已下载${contentType}文件`)
+    setTimeout(() => onMessage(''), 3000)
   }
 
   return (
@@ -194,11 +334,21 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
             id="view-select"
             className="view-select"
             value={view}
-            onChange={(e) => setView(e.target.value as 'json' | 'drawn-image' | 'ocr-text')}
+            onChange={(e) => setView(e.target.value)}
           >
-            <option value="json">JSON</option>
-            <option value="drawn-image">绘制图像</option>
-            {resultType !== 'layout' && <option value="ocr-text">纯文本</option>}
+            {availableViews.map(option => {
+              const labels: Record<string, string> = {
+                'json': 'JSON',
+                'drawn-image': '绘制图像',
+                'ocr-text': '纯文本',
+                'markdown': 'Markdown'
+              }
+              return (
+                <option key={option} value={option}>
+                  {labels[option] || option}
+                </option>
+              )
+            })}
           </select>
         </div>
       </div>
@@ -207,6 +357,18 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
         {result ? (
           view === 'json' ? (
             <pre>{JSON.stringify(result, null, 2)}</pre>
+          ) : view === 'markdown' ? (
+            <div className="markdown-content">
+              {markdownContent ? (
+                <div className="markdown-rendered">
+                  <ReactMarkdown>
+                    {processMarkdownContent(markdownContent)}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p>Loading markdown content...</p>
+              )}
+            </div>
           ) : view === 'ocr-text' ? (
             <div className="ocr-text">
               <pre>{extractTextFromResult(result, resultType)}</pre>

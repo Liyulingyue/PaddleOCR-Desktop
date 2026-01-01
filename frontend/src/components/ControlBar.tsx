@@ -16,7 +16,7 @@ interface SidebarProps {
   pageType?: string
 }
 
-function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = 'http://localhost:8000', onMessage, pageType = 'ocr' }: SidebarProps) {
+function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [drawConfigExpanded, setDrawConfigExpanded] = useState(false)
 
@@ -30,9 +30,13 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
     else console.info(m)
   }
 
+  const getApiPrefix = () => {
+    return pageType === 'ppstructure' ? '/api/ppstructure' : '/api/ocr'
+  }
+
   const fetchModelStatus = async () => {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ocr/model_status`)
+      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/model_status`)
       if (res.ok) {
         const j = await res.json()
         setModelLoaded(Boolean(j.loaded))
@@ -51,7 +55,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const loadModel = async () => {
     setModelActionLoading(true)
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ocr/load`, { method: 'POST' })
+      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/load`, { method: 'POST' })
       if (res.ok) {
         showMsg('模型加载完成')
         setModelLoaded(true)
@@ -69,7 +73,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const unloadModel = async () => {
     setModelActionLoading(true)
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ocr/unload`, { method: 'POST' })
+      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/unload`, { method: 'POST' })
       if (res.ok) {
         showMsg('模型已卸载')
         setModelLoaded(false)
