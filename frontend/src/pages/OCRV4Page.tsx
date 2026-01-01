@@ -1,7 +1,8 @@
-import { useState } from 'react'
+nn./import { useState, useEffect } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
+import { getCachedApiBaseUrl } from '../utils/api'
 
 function OCRV4Page() {
   const [file, setFile] = useState<File | null>(null)
@@ -17,6 +18,20 @@ function OCRV4Page() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
+
+  // 获取API基础URL
+  useEffect(() => {
+    const fetchApiUrl = async () => {
+      try {
+        const url = await getCachedApiBaseUrl()
+        setApiBaseUrl(url)
+      } catch (error) {
+        console.error('Failed to get API URL:', error)
+      }
+    }
+    fetchApiUrl()
+  }, [])
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
@@ -52,7 +67,7 @@ function OCRV4Page() {
 
     try {
       // Fetch OCR result
-      const response = await fetch('http://localhost:8000/api/ocr', {
+      const response = await fetch('/api/ocr', {
         method: 'POST',
         body: formData,
       })
@@ -68,7 +83,7 @@ function OCRV4Page() {
       drawFormData.append('file', file)
       drawFormData.append('ocr_result', JSON.stringify(data))
       drawFormData.append('drop_score', config.dropScore.toString())
-      const drawResponse = await fetch('http://localhost:8000/api/ocr/draw', {
+      const drawResponse = await fetch('/api/ocr/draw', {
         method: 'POST',
         body: drawFormData,
       })
@@ -129,7 +144,7 @@ function OCRV4Page() {
             <div className="api-modal-content">
               <div className="api-section">
                 <h4>🔗 接口地址</h4>
-                <code className="api-url">http://localhost:8000</code>
+                <code className="api-url">{apiBaseUrl}</code>
               </div>
 
               <div className="api-section">
@@ -172,7 +187,7 @@ function OCRV4Page() {
 
 # OCR识别示例
 def ocr_image(file_path):
-    url = "http://localhost:8000/api/ocr"
+    url = "${apiBaseUrl}/api/ocr"
     
     with open(file_path, 'rb') as f:
         files = {'file': f}
@@ -186,7 +201,7 @@ def ocr_image(file_path):
 
 # 绘制结果示例  
 def draw_ocr_result(file_path, ocr_result):
-    url = "http://localhost:8000/api/ocr/draw"
+    url = "${apiBaseUrl}/api/ocr/draw"
     
     with open(file_path, 'rb') as f:
         files = {'file': f}

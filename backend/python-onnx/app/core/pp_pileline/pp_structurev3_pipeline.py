@@ -186,13 +186,13 @@ class PPStructureV3Pipeline:
             x1, y1, x2, y2 = bbox
             cropped = image[y1:y2, x1:x2]
 
-            if region_type in ['text', 'title', 'list']:
+            if region_type in ['text', 'paragraph_title', 'figure_title', 'table_title', 'doc_title', 'chart_title', 'list']:
                 # OCR处理
                 ocr_result = self._process_ocr_region(cropped, ocr_conf_threshold)
                 if ocr_result:
                     text_region = {
                         'bbox': bbox,
-                        'type': region_type,
+                        'type': region_type,  # 保持原始类型
                         'confidence': region.get('confidence', 0.0),
                         'text': ocr_result.get('text', ''),
                         'text_confidence': ocr_result.get('confidence', 0.0)
@@ -320,3 +320,147 @@ class PPStructureV3Pipeline:
         """
         # 使用布局模型的可视化
         return self.layout_model.visualize(image, regions)
+
+    def result_to_markdown(self, image: np.ndarray, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将文档分析结果转换为接近源文档结构的 Markdown 文档。
+        直接输出文档内容，不包含分析元数据。
+
+        Args:
+            image: 原始图像（numpy array）
+            analysis_result: analyze_structure返回的完整结果字典
+
+        Returns:
+            Dict[str, Any]: 包含 'markdown' 键的字典
+        """
+        import base64
+        import cv2
+
+        markdown_parts = []
+
+        # 获取所有区域，按阅读顺序排序
+        all_regions = []
+        all_regions.extend(analysis_result.get('text_regions', []))
+        all_regions.extend(analysis_result.get('table_regions', []))
+        all_regions.extend(analysis_result.get('formula_regions', []))
+        all_regions.extend(analysis_result.get('figure_regions', []))
+
+        # Sort by reading order: top->down, left->right
+        try:
+            sorted_regions = sorted(all_regions, key=lambda r: (min(r.get('bbox', [0,0,0,0])[1], r.get('bbox', [0,0,0,0])[3]), min(r.get('bbox', [0,0,0,0])[0], r.get('bbox', [0,0,0,0])[2])))
+        except Exception:
+            sorted_regions = all_regions
+
+        # Process regions sequentially - 直接输出内容，不添加元数据
+        for region in sorted_regions:
+            rtype = region.get('type', 'unknown')
+
+            if rtype in ['text', 'paragraph_title', 'figure_title', 'table_title', 'doc_title', 'chart_title', 'list']:
+                # 直接输出识别的文本内容
+                text = region.get('text', '').strip()
+                if text:
+                    # 根据类型添加适当的格式
+                    if rtype == 'doc_title':
+                        # 文档标题 - 一级标题
+                        markdown_parts.append(f"# {text}\n\n")
+                    elif rtype in ['paragraph_title', 'figure_title', 'table_title', 'chart_title']:
+                        # 段落标题、图表标题等 - 二级标题
+                        markdown_parts.append(f"## {text}\n\n")
+                    elif rtype == 'list':
+                        # 列表项
+                        markdown_parts.append(f"- {text}\n")
+                    else:
+                        # 普通文本
+                        markdown_parts.append(f"{text}\n\n")
+
+            elif rtype == 'table':
+                # 转换为markdown表格
+                table_data = region.get('table_data', [])
+                if table_data and isinstance(table_data, list) and len(table_data) > 0:
+                    try:
+                        # 确定最大列数
+                        max_cols = max((len(row) for row in table_data if isinstance(row, list)), default=0)
+                        if max_cols > 0:
+                            # 生成表头（如果第一行看起来像表头）
+                            headers = []
+                            data_rows = []
+                            if len(table_data) > 0 and isinstance(table_data[0], list):
+                                headers = [str(c) for c in table_data[0]]
+                                data_rows = table_data[1:]
+                            else:
+                                headers = [f"Col{i+1}" for i in range(max_cols)]
+                                data_rows = table_data
+
+                            # 确保表头有足够的列
+                            if len(headers) < max_cols:
+                                headers += [''] * (max_cols - len(headers))
+
+                            # 生成markdown表格
+                            markdown_parts.append('| ' + ' | '.join(headers) + ' |\n')
+                            markdown_parts.append('| ' + ' | '.join(['---'] * max_cols) + ' |\n')
+
+                            # 生成数据行
+                            for row in data_rows:
+                                if isinstance(row, list):
+                                    row_cells = [str(c) for c in row]
+                                    # 填充缺失的列
+                                    if len(row_cells) < max_cols:
+                                        row_cells += [''] * (max_cols - len(row_cells))
+                                    markdown_parts.append('| ' + ' | '.join(row_cells) + ' |\n')
+
+                            markdown_parts.append('\n')
+                        else:
+                            # 回退到HTML
+                            html = region.get('table_html', '')
+                            if html:
+                                markdown_parts.append(f"{html}\n\n")
+                            else:
+                                markdown_parts.append("*Table content not available*\n\n")
+                    except Exception as e:
+                        markdown_parts.append(f"*Table formatting error*\n\n")
+                else:
+                    # 回退到HTML
+                    html = region.get('table_html', '')
+                    if html:
+                        markdown_parts.append(f"{html}\n\n")
+                    else:
+                        markdown_parts.append("*No table content*\n\n")
+
+            elif rtype == 'formula':
+                # 输出LaTeX公式
+                latex = region.get('formula_latex', '').strip()
+                if latex:
+                    markdown_parts.append(f"$${latex}$$\n\n")
+                else:
+                    text_formula = region.get('formula_text', '').strip()
+                    if text_formula:
+                        markdown_parts.append(f"`{text_formula}`\n\n")
+                    else:
+                        markdown_parts.append("*Formula not available*\n\n")
+
+            elif rtype == 'figure':
+                # 嵌入裁剪的图片
+                try:
+                    bbox = region.get('bbox', [])
+                    if len(bbox) >= 4:
+                        x1, y1, x2, y2 = map(int, bbox[:4])
+                        x1, y1 = max(0, x1), max(0, y1)
+                        x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
+                        if x2 > x1 and y2 > y1:
+                            crop = image[y1:y2, x1:x2]
+                            s, enc = cv2.imencode('.png', cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
+                            if s:
+                                fig_b64 = base64.b64encode(enc.tobytes()).decode('utf-8')
+                                markdown_parts.append(f"![Figure](data:image/png;base64,{fig_b64})\n\n")
+                            else:
+                                markdown_parts.append("*Image not available*\n\n")
+                        else:
+                            markdown_parts.append("*Invalid image region*\n\n")
+                    else:
+                        markdown_parts.append("*No image data*\n\n")
+                except Exception as e:
+                    markdown_parts.append(f"*Image processing error*\n\n")
+
+        return {
+            'markdown': ''.join(markdown_parts)
+        }

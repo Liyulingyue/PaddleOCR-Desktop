@@ -18,7 +18,7 @@ function OCRV5Page() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
-  const [apiBaseUrl, setApiBaseUrl] = useState<string>('http://localhost:8000')
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
 
   // 获取API基础URL
   useEffect(() => {

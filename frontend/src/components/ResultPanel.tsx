@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import JSZip from 'jszip'
 
 interface ResultPanelProps {
   result: any
@@ -6,6 +8,9 @@ interface ResultPanelProps {
   drawnImage: string | any[] | null
   onMessage: (message: string) => void
   resultType?: string
+  viewOptions?: string[]
+  markdownContent?: string | null
+  markdownImageData?: string | null
 }
 
 // 从OCR结果中提取纯文本
@@ -62,9 +67,26 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
   return textLines.join('\n')
 }
 
-function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr' }: ResultPanelProps) {
-  const [view, setView] = useState<'json' | 'drawn-image' | 'ocr-text'>('json')
+function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr', viewOptions, markdownContent, markdownImageData }: ResultPanelProps) {
+  const defaultViewOptions = ['json', 'drawn-image']
+  if (resultType !== 'layout') {
+    defaultViewOptions.push('ocr-text')
+  }
+  const availableViews = viewOptions || defaultViewOptions
+  
+  const [view, setView] = useState<string>(availableViews[0])
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // 处理markdown内容，将图片引用替换为实际的data URI
+  const processMarkdownContent = (content: string | null): string => {
+    if (!content || !markdownImageData) return content || ''
+    
+    // 将相对路径的图片引用替换为base64 data URI
+    return content.replace(
+      /\(original_image\.png\)/g, 
+      `(data:image/png;base64,${markdownImageData})`
+    )
+  }
 
   useEffect(() => {
     if (view === 'ocr-text' && imageFile && result && canvasRef.current) {
@@ -173,18 +195,33 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
   const copyResult = async () => {
     try {
       let contentToCopy: string
+      let contentType: string
       
       if (view === 'ocr-text') {
         // 复制纯文本内容
         contentToCopy = extractTextFromResult(result, resultType)
+        contentType = '纯文本'
+      } else if (view === 'markdown') {
+        // 复制markdown内容
+        contentToCopy = markdownContent || 'No markdown content available'
+        contentType = 'Markdown'
+        if (!markdownContent) {
+          onMessage('警告：Markdown内容为空，将复制占位符文本')
+        }
+      } else if (view === 'drawn-image') {
+        // 图像视图无法复制到剪贴板
+        onMessage('图像无法复制到剪贴板，请使用下载功能保存图像')
+        setTimeout(() => onMessage(''), 3000)
+        return
       } else {
         // 复制JSON格式的结果
         contentToCopy = JSON.stringify(result || {}, null, 2)
+        contentType = 'JSON'
       }
       
       await navigator.clipboard.writeText(contentToCopy)
-      onMessage('已复制到剪贴板')
-      setTimeout(() => onMessage(''), 2000) // 2秒后自动隐藏
+      onMessage(`已复制${contentType}内容到剪贴板`)
+      setTimeout(() => onMessage(''), 3000) // 3秒后自动隐藏
     } catch (e) {
       onMessage('复制失败')
       setTimeout(() => onMessage(''), 2000)
@@ -195,17 +232,80 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
     let content: string
     let filename: string
     let mimeType: string
+    let contentType: string
     
     if (view === 'ocr-text') {
       // 下载纯文本内容
       content = extractTextFromResult(result, resultType)
       filename = resultType === 'layout' ? 'layout_result.txt' : 'ocr_result.txt'
       mimeType = 'text/plain'
+      contentType = '纯文本'
+    } else if (view === 'markdown') {
+      // 下载markdown内容和图片的压缩包
+      const zip = new JSZip()
+      
+      // 添加markdown文件
+      const mdContent = markdownContent || '# Error\n\nNo markdown content available'
+      zip.file('document.md', mdContent)
+      
+      // 提取并添加base64图片
+      const imageRegex = /!\[.*?\]\(data:image\/png;base64,([^)]+)\)/g
+      let match
+      let imageIndex = 1
+      while ((match = imageRegex.exec(mdContent)) !== null) {
+        const base64Data = match[1]
+        const imageBlob = new Blob(
+          [Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], 
+          { type: 'image/png' }
+        )
+        zip.file(`image_${imageIndex}.png`, imageBlob)
+        imageIndex++
+      }
+      
+      // 生成并下载压缩包
+      zip.generateAsync({ type: 'blob' }).then((content) => {
+        const url = URL.createObjectURL(content)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'document_with_images.zip'
+        a.click()
+        URL.revokeObjectURL(url)
+        onMessage('已下载Markdown文档和图片压缩包')
+        setTimeout(() => onMessage(''), 3000)
+      })
+      return
+      // 下载绘制图像
+      // 对于drawn-image视图，如果有图片URL，我们需要下载图片
+      if (drawnImage && typeof drawnImage === 'string') {
+        // 单张图片，直接下载
+        const a = document.createElement('a')
+        a.href = drawnImage as string
+        a.download = resultType === 'layout' ? 'layout_visualization.png' : 'ocr_visualization.png'
+        a.click()
+        onMessage('已下载图像文件')
+        setTimeout(() => onMessage(''), 3000)
+        return
+      } else if (drawnImage && Array.isArray(drawnImage) && drawnImage!.length > 0) {
+        // 多页PDF图片，下载第一页作为示例
+        const a = document.createElement('a')
+        a.href = (drawnImage as any[])[0]?.image || ''
+        a.download = 'document_visualization_page1.png'
+        a.click()
+        onMessage('已下载第一页图像文件')
+        setTimeout(() => onMessage(''), 3000)
+        return
+      }
+      // 如果没有图片，回退到JSON
+      content = JSON.stringify(result || {}, null, 2)
+      filename = resultType === 'layout' ? 'layout_result.json' : 'ocr_result.json'
+      mimeType = 'application/json'
+      contentType = 'JSON'
     } else {
       // 下载JSON格式的结果
       content = JSON.stringify(result || {}, null, 2)
       filename = resultType === 'layout' ? 'layout_result.json' : 'ocr_result.json'
       mimeType = 'application/json'
+      contentType = 'JSON'
     }
     
     const blob = new Blob([content], { type: mimeType })
@@ -215,6 +315,9 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+    
+    onMessage(`已下载${contentType}文件`)
+    setTimeout(() => onMessage(''), 3000)
   }
 
   return (
@@ -231,11 +334,21 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
             id="view-select"
             className="view-select"
             value={view}
-            onChange={(e) => setView(e.target.value as 'json' | 'drawn-image' | 'ocr-text')}
+            onChange={(e) => setView(e.target.value)}
           >
-            <option value="json">JSON</option>
-            <option value="drawn-image">绘制图像</option>
-            {resultType !== 'layout' && <option value="ocr-text">纯文本</option>}
+            {availableViews.map(option => {
+              const labels: Record<string, string> = {
+                'json': 'JSON',
+                'drawn-image': '绘制图像',
+                'ocr-text': '纯文本',
+                'markdown': 'Markdown'
+              }
+              return (
+                <option key={option} value={option}>
+                  {labels[option] || option}
+                </option>
+              )
+            })}
           </select>
         </div>
       </div>
@@ -244,6 +357,18 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
         {result ? (
           view === 'json' ? (
             <pre>{JSON.stringify(result, null, 2)}</pre>
+          ) : view === 'markdown' ? (
+            <div className="markdown-content">
+              {markdownContent ? (
+                <div className="markdown-rendered">
+                  <ReactMarkdown>
+                    {processMarkdownContent(markdownContent)}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p>Loading markdown content...</p>
+              )}
+            </div>
           ) : view === 'ocr-text' ? (
             <div className="ocr-text">
               <pre>{extractTextFromResult(result, resultType)}</pre>

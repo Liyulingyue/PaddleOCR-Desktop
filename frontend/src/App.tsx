@@ -15,12 +15,15 @@ import './styles/viewer.css'
 import './styles/result.css'
 import './pages/HomePage.css'
 
+// 检查是否在 Tauri 环境中
+const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined
+
 function App() {
   return (
     <Router>
       <HeaderBar />
-      <TauriCloseHandler />
-      <BackendLogPanel />
+      {isTauri && <TauriCloseHandler />}
+      {isTauri && <BackendLogPanel />}
       <FrontendLogPanel />
       <Routes>
         <Route path="/" element={<HomePage />} />

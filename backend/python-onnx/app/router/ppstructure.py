@@ -145,10 +145,59 @@ async def draw_structure_result(
         if not success:
             return JSONResponse(status_code=500, content={"error": "Failed to encode image"})
 
-        # Convert to base64
-        import base64
-        img_base64 = base64.b64encode(encoded_image.tobytes()).decode('utf-8')
-        return {"result": f"data:image/png;base64,{img_base64}"}
+        # Return as streaming response (same as OCR)
+        from fastapi.responses import StreamingResponse
+        buf = io.BytesIO(encoded_image.tobytes())
+        return StreamingResponse(buf, media_type='image/png')
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/markdown")
+async def generate_markdown(
+    file: UploadFile = File(...),
+    layout_result: str = Form(...)
+):
+    """
+    根据PP-StructureV3结果生成Markdown文档
+
+    Args:
+        file: 上传的图像文件
+        layout_result: 结构分析结果的JSON字符串（layout格式）
+    """
+    if not HAS_PIPELINE:
+        return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用"})
+
+    contents = await file.read()
+
+    try:
+        # Load image
+        img = Image.open(io.BytesIO(contents)).convert("RGB")
+        img_array = np.array(img)
+
+        # Parse structure result
+        structure_data = json.loads(layout_result)
+        layout_regions = structure_data.get("results", [])
+
+        # Get pipeline for markdown generation
+        pipeline = get_global_pipeline()
+        if pipeline is None:
+            return JSONResponse(status_code=500, content={"error": "Pipeline未初始化"})
+
+        # 确保模型已加载
+        if not pipeline.is_loaded():
+            if not pipeline.load():
+                return JSONResponse(status_code=500, content={"error": "模型加载失败"})
+
+        # Delegate to pipeline to create a source-like markdown
+        try:
+            # First run structure analysis to get complete results
+            analysis_result = pipeline.analyze_structure(img_array, layout_conf_threshold=0.5)
+            result_md = pipeline.result_to_markdown(img_array, analysis_result)
+            return result_md
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": f"Failed to generate markdown: {str(e)}"})
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
