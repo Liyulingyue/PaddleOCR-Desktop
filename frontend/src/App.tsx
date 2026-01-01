@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import OCRV5Page from './pages/OCRV5Page'
 import PPStructureV3Page from './pages/PPStructureV3Page'
+import ModelManagementPage from './pages/ModelManagementPage'
 import HeaderBar from './components/HeaderBar'
 import { TauriCloseHandler } from './components/TauriCloseHandler'
 import { BackendLogPanel } from './components/BackendLogPanel'
@@ -29,6 +30,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/ocrv5" element={<OCRV5Page />} />
         <Route path="/ppstructurev3" element={<PPStructureV3Page />} />
+        <Route path="/model-management" element={<ModelManagementPage />} />
         <Route path="/ocrv4" element={<div>OCR V4 页面即将上线</div>} />
       </Routes>
     </Router>

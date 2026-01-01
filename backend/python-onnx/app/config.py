@@ -24,66 +24,110 @@ DEFAULT_MODELS_DIR = os.path.join(BASE_DIR, "models")
 def get_models_dir():
     return os.environ.get("PPOCR_MODELS_DIR", DEFAULT_MODELS_DIR)
 
+def get_work_dir():
+    """获取工作目录（比models目录高一级，通常是项目根目录）"""
+    return BASE_DIR
+
 # =============================================================================
 # 模型注册表：模型名称到下载源的映射
 # =============================================================================
 MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
-    # PP-StructureV3 相关模型
+    # 文档结构模型（ModelScope）
     "PP-DocLayout-L-ONNX": {
-        "modelscope_id": "Liyulingyue/PP-DocLayout-L-ONNX",  # 魔搭社区模型ID
+        "modelscope_id": "Liyulingyue/PP-DocLayout-L-ONNX",
+        "local_path": "models/PP-DocLayout-L-ONNX",
     },
     "PP-DocLayout-M-ONNX": {
-        "modelscope_id": "Liyulingyue/PP-DocLayout-M-ONNX",  # 魔搭社区模型ID
+        "modelscope_id": "Liyulingyue/PP-DocLayout-M-ONNX",
+        "local_path": "models/PP-DocLayout-M-ONNX",
     },
     "PP-DocLayout-S-ONNX": {
-        "modelscope_id": "Liyulingyue/PP-DocLayout-S-ONNX",  # 魔搭社区模型ID
+        "modelscope_id": "Liyulingyue/PP-DocLayout-S-ONNX",
+        "local_path": "models/PP-DocLayout-S-ONNX",
     },
     "PP-DocLayout-plus-L-ONNX": {
-        "modelscope_id": "Liyulingyue/PP-DocLayout-plus-L-ONNX",  # 魔搭社区模型ID
+        "modelscope_id": "Liyulingyue/PP-DocLayout-plus-L-ONNX",
+        "local_path": "models/PP-DocLayout-plus-L-ONNX",
+    },
+
+    # PP-OCRv5 系列（移动/服务器版本）
+    "PP-OCRv5_mobile_det-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-OCRv5_mobile_det-ONNX",
+        "local_path": "models/PP-OCRv5_mobile_det-ONNX",
+    },
+    "PP-OCRv5_mobile_rec-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-OCRv5_mobile_rec-ONNX",
+        "local_path": "models/PP-OCRv5_mobile_rec-ONNX",
+    },
+    "PP-OCRv5_server_det-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-OCRv5_server_det-ONNX",
+        "local_path": "models/PP-OCRv5_server_det-ONNX",
+    },
+    "PP-OCRv5_server_rec-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-OCRv5_server_rec-ONNX",
+        "local_path": "models/PP-OCRv5_server_rec-ONNX",
+    },
+
+    "PP-LCNet_x1_0_textline_ori-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-LCNet_x1_0_textline_ori-ONNX",
+        "local_path": "models/PP-LCNet_x1_0_textline_ori-ONNX",
+    },
+    "PP-LCNet_x0_25_textline_ori-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-LCNet_x0_25_textline_ori-ONNX",
+        "local_path": "models/PP-LCNet_x0_25_textline_ori-ONNX",
+    },
+    "PP-LCNet_x1_0_doc_ori-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-LCNet_x1_0_doc_ori-ONNX",
+        "local_path": "models/PP-LCNet_x1_0_doc_ori-ONNX",
+    },
+
+    "UVDoc-ONNX": {
+        "modelscope_id": "Liyulingyue/UVDoc-ONNX",
+        "local_path": "models/UVDoc-ONNX",
     },
 }
 
-# =============================================================================
-# Pipeline配置：pipeline和使用模型的对应关系
-# =============================================================================
-PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
-    "pp_structure_v3": {
-        "models": {
-            "layout": "PP-DocLayout-L-ONNX",
-            "ocr_det": "PP-OCRv5-Det",
-            "ocr_rec": "PP-OCRv5-Rec",
-            "ocr_cls": "PP-OCRv5-Cls",
-            "ocr_dict": "PP-OCRv5-Dict"
-        },
-        "description": "PP-StructureV3 完整文档结构分析流水线"
-    },
-    "ppocrv5": {
-        "models": {
-            "det": "PP-OCRv5-Det",
-            "rec": "PP-OCRv5-Rec",
-            "cls": "PP-OCRv5-Cls",
-            "dict": "PP-OCRv5-Dict"
-        },
-        "description": "PP-OCRv5 OCR识别流水线"
-    }
-}
+# # =============================================================================
+# # Pipeline配置：pipeline和使用模型的对应关系
+# # =============================================================================
+# PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
+#     "pp_structure_v3": {
+#         "models": {
+#             "layout": "PP-DocLayout-L-ONNX",
+#             "ocr_det": "PP-OCRv5-Det",
+#             "ocr_rec": "PP-OCRv5-Rec",
+#             "ocr_cls": "PP-OCRv5-Cls",
+#             "ocr_dict": "PP-OCRv5-Dict"
+#         },
+#         "description": "PP-StructureV3 完整文档结构分析流水线"
+#     },
+#     "ppocrv5": {
+#         "models": {
+#             "det": "PP-OCRv5-Det",
+#             "rec": "PP-OCRv5-Rec",
+#             "cls": "PP-OCRv5-Cls",
+#             "dict": "PP-OCRv5-Dict"
+#         },
+#         "description": "PP-OCRv5 OCR识别流水线"
+#     }
+# }
 
-# 向后兼容的旧配置（已废弃，建议使用新的结构）
-models_config = {
-    "pp_structure_v3": {
-        "layout": MODEL_REGISTRY["PP-DocLayout-L-ONNX"],
-        "ocr_det": MODEL_REGISTRY["PP-OCRv5-Det"],
-        "ocr_rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
-        "ocr_cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
-        "ocr_dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
-    },
-    "ppocrv5": {
-        "det": MODEL_REGISTRY["PP-OCRv5-Det"],
-        "rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
-        "cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
-        "dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
-    }
-}
+# # 向后兼容的旧配置（已废弃，建议使用新的结构）
+# models_config = {
+#     "pp_structure_v3": {
+#         "layout": MODEL_REGISTRY["PP-DocLayout-L-ONNX"],
+#         "ocr_det": MODEL_REGISTRY["PP-OCRv5-Det"],
+#         "ocr_rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
+#         "ocr_cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
+#         "ocr_dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
+#     },
+#     "ppocrv5": {
+#         "det": MODEL_REGISTRY["PP-OCRv5-Det"],
+#         "rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
+#         "cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
+#         "dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
+#     }
+# }
 
 def get_model_path(model_type: str, component: str) -> Optional[str]:
     """

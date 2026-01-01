@@ -18,6 +18,9 @@ function HomePage() {
               <button className="primary-btn" onClick={() => navigate('/ppstructurev3')}>
                 PP-Structure V3 布局检测
               </button>
+              <button className="primary-btn" onClick={() => navigate('/model-management')}>
+                📦 模型管理
+              </button>
               {/* <button className="secondary-btn" onClick={() => navigate('/ocrv4')}>
                 OCR识别 (V4)
               </button> */}

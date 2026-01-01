@@ -1,0 +1,278 @@
+.page-container {
+  padding-top: 84px; /* 为固定 Header 留出空间，与其他页面一致 */
+  min-height: calc(100vh - 84px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-container h1 {
+  margin-bottom: 2rem;
+  color: white;
+  text-align: center;
+}
+
+/* 批量操作栏 */
+.batch-actions {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  margin: 0 1rem 1rem 1rem;
+  width: calc(100% - 2rem);
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.select-all input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #007bff;
+}
+
+.select-all label {
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.batch-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-left: auto; /* 靠右对齐 */
+}
+
+.batch-download-btn, .batch-delete-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.batch-download-btn {
+  background-color: #28a745;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.batch-download-btn:hover:not(:disabled) {
+  background-color: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.batch-delete-btn {
+  background-color: #dc3545;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.batch-delete-btn:hover:not(:disabled) {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.batch-download-btn:disabled, .batch-delete-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0;
+  width: calc(100% - 2rem);
+  margin: 0 1rem 1rem 1rem;
+  box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.model-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 180px; /* 选中框、信息、操作列固定宽度 */
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.model-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-selection input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #007bff;
+}
+
+.model-info {
+  /* 信息区自动撑开，占用中间列 */
+}
+
+.model-info h3 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+}
+
+.model-info p {
+  margin: 0.25rem 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.model-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-self: end; /* 将操作按钮右对齐到操作列 */
+  align-items: center;
+}
+
+.download-btn {
+  padding: 0.5rem 1rem;
+  background-color: #35dc3d;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3); /* 添加阴影，与download-btn对齐 */
+}
+
+.download-btn:hover:not(:disabled) {
+  background-color: #23c86d;
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.download-btn:disabled {
+  background-color: #6c757d;
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.delete-btn {
+  padding: 0.5rem 1rem;
+  background-color: #dc3545;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3); /* 添加阴影，与download-btn对齐 */
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: #c82333;
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.delete-btn:disabled {
+  background-color: #6c757d;
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 模态对话框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.modal-content h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.modal-content p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.cancel-btn:hover {
+  background-color: #5a6268;
+}
+
+.confirm-delete-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.confirm-delete-btn:hover {
+  background-color: #c82333;
+}
