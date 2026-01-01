@@ -1,0 +1,42 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# ONNX models (large files, can be regenerated)
+models_onnx/
+
+# Extracted Paddle models (can be regenerated from tar files)
+models_pp/
+models_tar/
+
+# Logs
+*.log
+paddle2onnx_conversion_results.csv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
