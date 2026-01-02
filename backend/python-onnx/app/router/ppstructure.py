@@ -194,11 +194,16 @@ async def generate_markdown(
 
         # Delegate to pipeline to create markdown directly from analysis result
         try:
+            print(f"Calling result_to_markdown with image shape: {img_array.shape}")
+            print(f"Analysis data keys: {list(analysis_data.keys())}")
             result_md = pipeline.result_to_markdown(img_array, analysis_data)
             print(f"Generated markdown length: {len(result_md.get('markdown', ''))}")
             print(f"Markdown preview: {result_md.get('markdown', '')[:200]}")
             return result_md
         except Exception as e:
+            print(f"Error in result_to_markdown: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return JSONResponse(status_code=500, content={"error": f"Failed to generate markdown: {str(e)}"})
 
     except Exception as e:

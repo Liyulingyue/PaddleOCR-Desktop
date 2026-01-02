@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Tuple, Optional, Union
 from pathlib import Path
 import cv2
 import numpy as np
+import base64
 
 from ..pp_onnx.pp_doclayout_onnx import PPDocLayoutONNX
 from .pp_ocrv5_pipeline import PPOCRv5Pipeline
@@ -380,19 +381,20 @@ class PPStructureV3Pipeline:
     def result_to_markdown(self, image: np.ndarray, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         """
         将文档分析结果转换为接近源文档结构的 Markdown 文档。
-        直接输出文档内容，不包含分析元数据。
+        返回markdown内容和图片文件列表。
 
         Args:
             image: 原始图像（numpy array）
             analysis_result: analyze_structure返回的完整结果字典
 
         Returns:
-            Dict[str, Any]: 包含 'markdown' 键的字典
+            Dict[str, Any]: 包含 'markdown' 和 'images' 键的字典
         """
-        import base64
-        import cv2
+        print(f"result_to_markdown called with image shape: {image.shape}")
+        print(f"analysis_result keys: {list(analysis_result.keys())}")
 
         markdown_parts = []
+        images = []  # 存储图片数据
 
         # 获取所有区域，按阅读顺序排序
         all_regions = []
@@ -400,6 +402,10 @@ class PPStructureV3Pipeline:
         all_regions.extend(analysis_result.get('table_regions', []))
         all_regions.extend(analysis_result.get('formula_regions', []))
         all_regions.extend(analysis_result.get('figure_regions', []))
+
+        print(f"Total regions to process: {len(all_regions)}")
+        for i, region in enumerate(all_regions[:3]):  # 只打印前3个
+            print(f"Region {i}: type={region.get('type')}, bbox={region.get('bbox')}")
 
         # Sort by reading order: top->down, left->right
         try:
@@ -506,10 +512,22 @@ class PPStructureV3Pipeline:
                             crop = image[y1:y2, x1:x2]
                             s, enc = cv2.imencode('.png', cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
                             if s:
-                                fig_b64 = base64.b64encode(enc.tobytes()).decode('utf-8')
-                                fig_md = f"![Figure](data:image/png;base64,{fig_b64})\n\n"
-                                markdown_parts.append(fig_md)
-                                print(f"Added figure to markdown: bbox={bbox}, image size={crop.shape}, base64 length={len(fig_b64)}")
+                                # 生成唯一的图片文件名
+                                image_filename = f"figure_{len(images) + 1}.png"
+                                image_data = enc.tobytes()
+                                
+                                # 将图片数据转换为base64编码的字符串，以便JSON序列化
+                                base64_data = base64.b64encode(image_data).decode('utf-8')
+                                
+                                # 存储图片数据
+                                images.append({
+                                    'filename': image_filename,
+                                    'data': base64_data
+                                })
+                                
+                                # 在markdown中引用图片
+                                markdown_parts.append(f"![Figure](images/{image_filename})\n\n")
+                                print(f"Added figure to markdown: {image_filename}, bbox={bbox}, image size={crop.shape}")
                             else:
                                 markdown_parts.append("*Image encoding failed*\n\n")
                         else:
@@ -521,7 +539,8 @@ class PPStructureV3Pipeline:
                     markdown_parts.append(f"*Image processing error: {e}*\n\n")
 
         return {
-            'markdown': ''.join(markdown_parts)
+            'markdown': ''.join(markdown_parts),
+            'images': images
         }
 
     def _unclip_polygon(self, box_points: np.ndarray, unclip_ratio: float) -> np.ndarray:

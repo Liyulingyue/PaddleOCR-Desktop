@@ -13,6 +13,7 @@ interface ResultPanelProps {
   viewOptions?: string[]
   markdownContent?: string | null
   markdownImageData?: string | null
+  markdownImages?: { [key: string]: string } | null
 }
 
 // 从OCR结果中提取纯文本
@@ -69,7 +70,7 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
   return textLines.join('\n')
 }
 
-function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr', viewOptions, markdownContent, markdownImageData }: ResultPanelProps) {
+function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr', viewOptions, markdownContent, markdownImageData, markdownImages }: ResultPanelProps) {
   const defaultViewOptions = ['json', 'drawn-image']
   if (resultType !== 'layout') {
     defaultViewOptions.push('ocr-text')
@@ -81,13 +82,30 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
 
   // 处理markdown内容，将图片引用替换为实际的data URI
   const processMarkdownContent = (content: string | null): string => {
-    if (!content || !markdownImageData) return content || ''
+    if (!content) return content || ''
+    
+    let processedContent = content
+    
+    console.log('Processing markdown content, markdownImages:', markdownImages)
     
     // 将相对路径的图片引用替换为base64 data URI
-    return content.replace(
-      /\(original_image\.png\)/g, 
-      `(data:image/png;base64,${markdownImageData})`
-    )
+    if (markdownImages) {
+      Object.entries(markdownImages).forEach(([filename, base64Data]) => {
+        const regex = new RegExp(`\\(images/${filename}\\)`, 'g')
+        processedContent = processedContent.replace(regex, `(${base64Data})`)
+        console.log(`Replaced images/${filename} with base64 data`)
+      })
+    }
+    
+    // 兼容旧格式
+    if (markdownImageData) {
+      processedContent = processedContent.replace(
+        /\(original_image\.png\)/g, 
+        `(data:image/png;base64,${markdownImageData})`
+      )
+    }
+    
+    return processedContent
   }
 
   useEffect(() => {
@@ -250,18 +268,20 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
       const mdContent = markdownContent || '# Error\n\nNo markdown content available'
       zip.file('document.md', mdContent)
       
-      // 提取并添加base64图片
-      const imageRegex = /!\[.*?\]\(data:image\/png;base64,([^)]+)\)/g
-      let match
-      let imageIndex = 1
-      while ((match = imageRegex.exec(mdContent)) !== null) {
-        const base64Data = match[1]
-        const imageBlob = new Blob(
-          [Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], 
-          { type: 'image/png' }
-        )
-        zip.file(`image_${imageIndex}.png`, imageBlob)
-        imageIndex++
+      // 添加单独的图片文件（如果有的话）
+      if (markdownImages) {
+        Object.entries(markdownImages).forEach(([filename, base64Data]) => {
+          // 从base64数据中提取实际的图片数据
+          const base64Match = base64Data.match(/^data:image\/png;base64,(.+)$/)
+          if (base64Match) {
+            const imageBlob = new Blob(
+              [Uint8Array.from(atob(base64Match[1]), c => c.charCodeAt(0))], 
+              { type: 'image/png' }
+            )
+            // 将图片保存在images目录中，与markdown中的引用路径匹配
+            zip.file(`images/${filename}`, imageBlob)
+          }
+        })
       }
       
       // 生成并下载压缩包
@@ -276,8 +296,6 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
         setTimeout(() => onMessage(''), 3000)
       })
       return
-      // 下载绘制图像
-      // 对于drawn-image视图，如果有图片URL，我们需要下载图片
       if (drawnImage && typeof drawnImage === 'string') {
         // 单张图片，直接下载
         const a = document.createElement('a')

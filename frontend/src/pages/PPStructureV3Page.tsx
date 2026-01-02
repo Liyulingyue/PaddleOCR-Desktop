@@ -10,6 +10,7 @@ function PPStructureV3Page() {
   const [drawnImage, setDrawnImage] = useState<string | null>(null)
   const [markdownContent, setMarkdownContent] = useState<string | null>(null)
   const [markdownImageData, setMarkdownImageData] = useState<string | null>(null)
+  const [markdownImages, setMarkdownImages] = useState<{ [key: string]: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [config, setConfig] = useState({
@@ -88,10 +89,22 @@ function PPStructureV3Page() {
         const markdownData = await markdownResponse.json()
         console.log('Markdown data received:', markdownData)
         console.log('Markdown content length:', markdownData.markdown?.length)
-        console.log('Markdown content preview:', markdownData.markdown?.substring(0, 200))
+        console.log('Images count:', markdownData.images?.length)
+        
+        // 将图片数据转换为前端可用的格式
+        const processedImages: { [key: string]: string } = {}
+        if (markdownData.images && Array.isArray(markdownData.images)) {
+          markdownData.images.forEach((img: any) => {
+            if (img.filename && img.data) {
+              // 后端已经返回base64编码的数据，直接使用
+              processedImages[img.filename] = `data:image/png;base64,${img.data}`
+            }
+          })
+        }
+        
         setMarkdownContent(markdownData.markdown)
-        setMarkdownImageData(null)
-        console.log('Markdown content set:', markdownData.markdown)
+        setMarkdownImages(processedImages)
+        console.log('Markdown content set with images:', Object.keys(processedImages))
       } else {
         console.error('Failed to fetch markdown content')
         setMarkdownContent('# Error\n\nFailed to generate markdown content.')
@@ -141,7 +154,7 @@ function PPStructureV3Page() {
         pageType="ppstructure"
       />
       <Viewer file={file} />
-      <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessage} resultType="layout" viewOptions={['json', 'drawn-image', 'markdown']} markdownContent={markdownContent} markdownImageData={markdownImageData} />
+      <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessage} resultType="layout" viewOptions={['json', 'drawn-image', 'markdown']} markdownContent={markdownContent} markdownImageData={markdownImageData} markdownImages={markdownImages} />
 
       {showApiModal && (
         <div className="api-modal-overlay" onClick={() => setShowApiModal(false)}>
@@ -201,7 +214,8 @@ function PPStructureV3Page() {
                   </ul>
                   <h5>返回：</h5>
                   <ul>
-                    <li><code>markdown</code>: 生成的Markdown文档字符串（包含嵌入的base64图片）</li>
+                    <li><code>markdown</code>: 生成的Markdown文档字符串（包含相对路径图片引用）</li>
+                    <li><code>images</code>: 图片数组，每个图片包含 <code>filename</code> 和 <code>data</code>（二进制数据）</li>
                   </ul>
                 </div>
               </div>
