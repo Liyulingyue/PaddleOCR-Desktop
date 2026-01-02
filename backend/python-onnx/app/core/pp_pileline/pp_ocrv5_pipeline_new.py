@@ -109,6 +109,53 @@ class PPOCRv5Pipeline:
         
         return results
 
+    def load(self) -> bool:
+        """
+        Load the OCR pipeline models.
+        Since models are loaded in __init__, this always returns True.
+        
+        Returns:
+            bool: Always True since models are loaded at initialization
+        """
+        return True
+
+    def unload(self) -> bool:
+        """
+        Unload the OCR pipeline models to free memory.
+        
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Clean up model instances
+            if hasattr(self, 'cls_model') and self.cls_model is not None:
+                del self.cls_model
+                self.cls_model = None
+            
+            if hasattr(self, 'det_model') and self.det_model is not None:
+                del self.det_model
+                self.det_model = None
+                
+            if hasattr(self, 'rec_model') and self.rec_model is not None:
+                del self.rec_model
+                self.rec_model = None
+                
+            return True
+        except Exception as e:
+            print(f"Failed to unload PPOCRv5Pipeline models: {e}")
+            return False
+
+    def is_loaded(self) -> bool:
+        """
+        Check if the pipeline models are loaded.
+        
+        Returns:
+            bool: True if all models are loaded
+        """
+        return (hasattr(self, 'cls_model') and self.cls_model is not None and
+                hasattr(self, 'det_model') and self.det_model is not None and
+                hasattr(self, 'rec_model') and self.rec_model is not None)
+
     def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None) -> np.ndarray:
         """
         Visualize OCR results on image
