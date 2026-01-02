@@ -49,7 +49,7 @@ class PPOCRv5Pipeline:
         
         print("PP-OCRv5 Pipeline initialized (models not loaded yet). Call load() to load models.")
 
-    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True) -> List[Dict]:
+    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True, cls_thresh: float = 0.9, use_cls: bool = True) -> List[Dict]:
         """
         Run complete OCR pipeline on input image
         
@@ -57,6 +57,8 @@ class PPOCRv5Pipeline:
             image: Input image (BGR format)
             conf_threshold: Confidence threshold for detection and recognition
             use_close: Whether to use morphological closing in detection
+            cls_thresh: Confidence threshold for classification
+            use_cls: Whether to use document orientation classification
             
         Returns:
             List of OCR results with text, bbox, confidence
@@ -71,9 +73,22 @@ class PPOCRv5Pipeline:
             if image is None:
                 raise ValueError(f"Could not load image from {image}")
         
-        # Step 1: Document orientation detection
-        cls_result = self.cls_model.classify(image)
-        angle = int(cls_result['angle'])
+        # Step 1: Document orientation detection (optional)
+        angle = 0
+        rotation_confidence = 1.0
+        if use_cls:
+            cls_result = self.cls_model.classify(image)
+            if cls_result['confidence'] >= cls_thresh:
+                angle = int(cls_result['angle'])
+                rotation_confidence = cls_result['confidence']
+            else:
+                # Low confidence, assume no rotation needed
+                angle = 0
+                rotation_confidence = 1.0
+        else:
+            # Skip classification, assume no rotation
+            angle = 0
+            rotation_confidence = 1.0
         
         # Step 2: Rotate image based on detected angle
         if angle == 90:
@@ -109,7 +124,7 @@ class PPOCRv5Pipeline:
                 'confidence': rec_result['confidence'],
                 'text_region_confidence': det['confidence'],
                 'rotation': angle,
-                'rotation_confidence': cls_result['confidence']
+                'rotation_confidence': rotation_confidence
             }
             results.append(result)
         
@@ -184,7 +199,7 @@ class PPOCRv5Pipeline:
                 hasattr(self, 'det_model') and self.det_model is not None and
                 hasattr(self, 'rec_model') and self.rec_model is not None)
 
-    def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None) -> np.ndarray:
+    def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None, cls_thresh: float = 0.9, use_cls: bool = True) -> np.ndarray:
         """
         Visualize OCR results on image
         
@@ -192,6 +207,8 @@ class PPOCRv5Pipeline:
             image: Original input image
             results: OCR results from ocr() method
             output_path: Path to save visualization (optional)
+            cls_thresh: Confidence threshold for classification
+            use_cls: Whether to use document orientation classification
             
         Returns:
             Image with OCR results drawn
@@ -202,8 +219,15 @@ class PPOCRv5Pipeline:
                 raise RuntimeError("Failed to auto-load PP-OCRv5 models.")
             
         # First, apply the same rotation as in ocr()
-        cls_result = self.cls_model.classify(image)
-        angle = int(cls_result['angle'])
+        angle = 0
+        if use_cls:
+            cls_result = self.cls_model.classify(image)
+            if cls_result['confidence'] >= cls_thresh:
+                angle = int(cls_result['angle'])
+            else:
+                angle = 0
+        else:
+            angle = 0
         
         if angle == 90:
             vis_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)

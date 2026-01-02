@@ -134,6 +134,7 @@ class PPStructureV3Pipeline:
         layout_conf_threshold: float = 0.5,
         layout_iou_threshold: float = 0.5,
         ocr_conf_threshold: float = 0.5,
+        unclip_ratio: float = 1.1,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -144,6 +145,7 @@ class PPStructureV3Pipeline:
             layout_conf_threshold: 布局检测置信度阈值
             layout_iou_threshold: 布局检测IOU阈值
             ocr_conf_threshold: OCR置信度阈值
+            unclip_ratio: 裁剪区域扩大倍数，默认1.1倍，用于包含更多上下文
             **kwargs: 其他参数
 
         Returns:
@@ -159,6 +161,16 @@ class PPStructureV3Pipeline:
             image = cv2.imread(image)
             if image is None:
                 raise ValueError(f"Failed to load image from {image}")
+
+        # # 创建输出目录用于保存裁剪的图像片段
+        # import os
+        # from datetime import datetime
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # output_dir = f"debug_crops_{timestamp}"
+        # os.makedirs(output_dir, exist_ok=True)
+        # print(f"Saving cropped regions to: {output_dir}")
+
+        # region_counter = 0
 
         # 步骤1: 布局检测
         layout_regions = self.layout_model.detect(
@@ -184,7 +196,38 @@ class PPStructureV3Pipeline:
                 continue
 
             x1, y1, x2, y2 = bbox
-            cropped = image[y1:y2, x1:x2]
+
+            # 应用unclip_ratio扩大裁剪区域 (默认1.1倍)
+            unclip_ratio = kwargs.get('unclip_ratio', 1.1)
+            if unclip_ratio > 1.0:
+                # Convert bbox to polygon points (clockwise order)
+                box_points = np.array([
+                    [x1, y1],  # top-left
+                    [x2, y1],  # top-right
+                    [x2, y2],  # bottom-right
+                    [x1, y2]   # bottom-left
+                ], dtype=np.float32)
+
+                # Apply unclip expansion
+                expanded_points = self._unclip_polygon(box_points, unclip_ratio)
+
+                # Get bounding box of expanded polygon
+                crop_x1 = max(0, int(np.min(expanded_points[:, 0])))
+                crop_y1 = max(0, int(np.min(expanded_points[:, 1])))
+                crop_x2 = min(image.shape[1], int(np.max(expanded_points[:, 0])))
+                crop_y2 = min(image.shape[0], int(np.max(expanded_points[:, 1])))
+
+                print(f"Unclip applied: {bbox} -> polygon expansion -> [{crop_x1}, {crop_y1}, {crop_x2}, {crop_y2}] (ratio: {unclip_ratio})")
+            else:
+                crop_x1, crop_y1, crop_x2, crop_y2 = x1, y1, x2, y2
+
+            cropped = image[crop_y1:crop_y2, crop_x1:crop_x2]
+
+            # # 保存裁剪的图像片段用于调试
+            # region_counter += 1
+            # crop_filename = f"{output_dir}/region_{region_counter:03d}_{region_type}_orig_{x1}_{y1}_{x2}_{y2}_crop_{crop_x1}_{crop_y1}_{crop_x2}_{crop_y2}.png"
+            # cv2.imwrite(crop_filename, cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR))
+            # print(f"Saved crop: {crop_filename} (size: {cropped.shape[1]}x{cropped.shape[0]})")
 
             if region_type in ['text', 'paragraph_title', 'figure_title', 'table_title', 'doc_title', 'chart_title', 'list']:
                 # OCR处理
@@ -225,14 +268,20 @@ class PPStructureV3Pipeline:
                     }
                     results['formula_regions'].append(formula_region)
 
-            elif region_type == 'figure':
+            elif region_type == 'figure' or region_type == 'image':
                 # 图片区域
                 figure_region = {
                     'bbox': bbox,
-                    'type': 'figure',
+                    'type': 'figure',  # 统一为figure类型
                     'confidence': region.get('confidence', 0.0)
                 }
                 results['figure_regions'].append(figure_region)
+
+        # print(f"Analysis complete. Saved {region_counter} cropped regions to {output_dir}")
+        # results['debug_info'] = {
+        #     'crop_output_dir': output_dir,
+        #     'total_crops_saved': region_counter
+        # }
 
         return results
 
@@ -249,7 +298,14 @@ class PPStructureV3Pipeline:
         """
         try:
             # 使用OCR流水线进行完整的OCR处理
-            ocr_results = self.ocr_pipeline.ocr(image, conf_threshold=conf_threshold)
+            # 文档结构分析优化：不开启方向检测，默认开启形态学膨胀
+            ocr_results = self.ocr_pipeline.ocr(
+                image, 
+                conf_threshold=conf_threshold,
+                use_cls=False,      # 文档分析默认不开启方向检测
+                cls_thresh=0.9,     # 方向检测阈值（不开启时不生效）
+                use_close=True      # 默认开启形态学膨胀
+            )
 
             if not ocr_results:
                 return None
@@ -438,7 +494,7 @@ class PPStructureV3Pipeline:
                     else:
                         markdown_parts.append("*Formula not available*\n\n")
 
-            elif rtype == 'figure':
+            elif rtype == 'figure' or rtype == 'image':
                 # 嵌入裁剪的图片
                 try:
                     bbox = region.get('bbox', [])
@@ -451,16 +507,78 @@ class PPStructureV3Pipeline:
                             s, enc = cv2.imencode('.png', cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
                             if s:
                                 fig_b64 = base64.b64encode(enc.tobytes()).decode('utf-8')
-                                markdown_parts.append(f"![Figure](data:image/png;base64,{fig_b64})\n\n")
+                                fig_md = f"![Figure](data:image/png;base64,{fig_b64})\n\n"
+                                markdown_parts.append(fig_md)
+                                print(f"Added figure to markdown: bbox={bbox}, image size={crop.shape}, base64 length={len(fig_b64)}")
                             else:
-                                markdown_parts.append("*Image not available*\n\n")
+                                markdown_parts.append("*Image encoding failed*\n\n")
                         else:
                             markdown_parts.append("*Invalid image region*\n\n")
                     else:
                         markdown_parts.append("*No image data*\n\n")
                 except Exception as e:
-                    markdown_parts.append(f"*Image processing error*\n\n")
+                    print(f"Error processing figure: {e}")
+                    markdown_parts.append(f"*Image processing error: {e}*\n\n")
 
         return {
             'markdown': ''.join(markdown_parts)
         }
+
+    def _unclip_polygon(self, box_points: np.ndarray, unclip_ratio: float) -> np.ndarray:
+        """
+        Expand polygon using similar approach to PaddleOCR's unclip
+
+        Args:
+            box_points: Polygon points (Nx2 array)
+            unclip_ratio: Expansion ratio
+
+        Returns:
+            Expanded polygon points
+        """
+        try:
+            from shapely.geometry import Polygon
+        except ImportError:
+            # Fallback to simple bbox expansion if shapely not available
+            print("Warning: shapely not available, using simple bbox expansion")
+            x_coords = box_points[:, 0]
+            y_coords = box_points[:, 1]
+            x1, x2 = np.min(x_coords), np.max(x_coords)
+            y1, y2 = np.min(y_coords), np.max(y_coords)
+
+            # Simple expansion
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+            width = x2 - x1
+            height = y2 - y1
+
+            new_width = width * unclip_ratio
+            new_height = height * unclip_ratio
+
+            new_x1 = center_x - new_width / 2
+            new_y1 = center_y - new_height / 2
+            new_x2 = center_x + new_width / 2
+            new_y2 = center_y + new_height / 2
+
+            return np.array([
+                [new_x1, new_y1],
+                [new_x2, new_y1],
+                [new_x2, new_y2],
+                [new_x1, new_y2]
+            ], dtype=np.float32)
+
+        # Use shapely for proper polygon expansion (like PaddleOCR)
+        poly = Polygon(box_points)
+        if poly.is_empty or not poly.is_valid:
+            return box_points
+
+        # Calculate expansion distance based on area and perimeter
+        distance = poly.area * unclip_ratio / poly.length
+
+        # Expand the polygon
+        expanded = poly.buffer(distance)
+        if expanded.is_empty:
+            return box_points
+
+        # Get the exterior coordinates
+        expanded_coords = list(expanded.exterior.coords)
+        return np.array(expanded_coords[:-1], dtype=np.float32)  # Remove closing point

@@ -13,7 +13,9 @@ function PPStructureV3Page() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [config, setConfig] = useState({
-    confThreshold: 0.5
+    confThreshold: 0.5,
+    ocrDetThresh: 0.3,
+    unclipRatio: 1.1
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -38,7 +40,7 @@ function PPStructureV3Page() {
     setDrawnImage(null)
   }
 
-  const handleConfigChange = (newConfig: { confThreshold: number }) => {
+  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number }) => {
     setConfig(newConfig)
   }
 
@@ -58,6 +60,8 @@ function PPStructureV3Page() {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('layout_conf_threshold', config.confThreshold.toString())
+    formData.append('ocr_det_db_thresh', config.ocrDetThresh.toString())
+    formData.append('unclip_ratio', config.unclipRatio.toString())
 
     try {
       // Fetch layout detection result
@@ -65,17 +69,17 @@ function PPStructureV3Page() {
         method: 'POST',
         body: formData,
       })
-      const data = await response.json()
+      const analysisResult = await response.json()
       if (response.ok) {
-        setResult(data.results)
+        setResult(analysisResult.layout_regions || [])
       } else {
-        setError(data.error || '上传失败')
+        setError(analysisResult.error || '上传失败')
       }
 
       // Fetch markdown content
       const markdownFormData = new FormData()
       markdownFormData.append('file', file)
-      markdownFormData.append('layout_result', JSON.stringify(data))
+      markdownFormData.append('analysis_result', JSON.stringify(analysisResult))
       const markdownResponse = await fetch('/api/ppstructure/markdown', {
         method: 'POST',
         body: markdownFormData,
@@ -83,6 +87,8 @@ function PPStructureV3Page() {
       if (markdownResponse.ok) {
         const markdownData = await markdownResponse.json()
         console.log('Markdown data received:', markdownData)
+        console.log('Markdown content length:', markdownData.markdown?.length)
+        console.log('Markdown content preview:', markdownData.markdown?.substring(0, 200))
         setMarkdownContent(markdownData.markdown)
         setMarkdownImageData(null)
         console.log('Markdown content set:', markdownData.markdown)
@@ -95,7 +101,7 @@ function PPStructureV3Page() {
       // Fetch drawn image
       const drawFormData = new FormData()
       drawFormData.append('file', file)
-      drawFormData.append('layout_result', JSON.stringify(data))
+      drawFormData.append('analysis_result', JSON.stringify(analysisResult))
       const drawResponse = await fetch('/api/ppstructure/draw', {
         method: 'POST',
         body: drawFormData,
@@ -160,7 +166,8 @@ function PPStructureV3Page() {
                   <h5>参数：</h5>
                   <ul>
                     <li><code>file</code>: 上传的图像文件</li>
-                    <li><code>layout_conf_threshold</code>: 置信度阈值 (0.0-1.0，默认: 0.5)</li>
+                    <li><code>layout_conf_threshold</code>: 布局检测阈值 (0.0-1.0，默认: 0.5)</li>
+                    <li><code>ocr_det_db_thresh</code>: OCR检测阈值 (0.0-1.0，默认: 0.3)</li>
                   </ul>
                 </div>
               </div>

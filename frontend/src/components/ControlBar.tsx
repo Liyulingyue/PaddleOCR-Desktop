@@ -18,7 +18,6 @@ interface SidebarProps {
 
 function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
-  const [drawConfigExpanded, setDrawConfigExpanded] = useState(false)
 
   // Model status panel
   const [modelExpanded, setModelExpanded] = useState(false)
@@ -111,6 +110,23 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
       <FileUpload onFileSelect={onFileSelect} />
 
       <div className="control-section">
+        <div className="button-group">
+          <button onClick={onUpload} disabled={loading || !file} className="control-btn primary-btn">
+            {loading ? '处理中...' : '开始识别'}
+          </button>
+          <button onClick={onClear} disabled={loading} className="control-btn secondary-btn">
+            清空
+          </button>
+        </div>
+        <div className="api-button-row">
+          <button onClick={onShowApiModal} className="control-btn info-btn">
+            📖 API文档
+          </button>
+        </div>
+        {error && <span className="error">{error}</span>}
+      </div>
+
+      <div className="control-section">
         <div 
           className="config-section-header"
           onClick={() => handleModelToggle()}
@@ -157,24 +173,62 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         {ocrConfigExpanded && (
           <div className="config-content">
             {pageType === 'ppstructure' ? (
-              <div className="config-item">
-                <label htmlFor="conf-threshold">置信度阈值: {config.confThreshold}</label>
-                <input
-                  id="conf-threshold"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={config.confThreshold}
-                  onChange={(e) => onConfigChange({ ...config, confThreshold: parseFloat(e.target.value) })}
-                  disabled={loading}
-                />
-                <div className="range-labels">
-                  <span>0.0</span>
-                  <span>1.0</span>
+              <>
+                <div className="config-item">
+                  <label htmlFor="conf-threshold">布局检测阈值: {config.confThreshold}</label>
+                  <input
+                    id="conf-threshold"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.confThreshold}
+                    onChange={(e) => onConfigChange({ ...config, confThreshold: parseFloat(e.target.value) })}
+                    disabled={loading}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制布局检测的置信度阈值</small>
                 </div>
-                <small className="config-description">控制布局检测的置信度阈值</small>
-              </div>
+                <div className="config-item">
+                  <label htmlFor="ocr-det-thresh">OCR检测阈值: {config.ocrDetThresh}</label>
+                  <input
+                    id="ocr-det-thresh"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.ocrDetThresh}
+                    onChange={(e) => onConfigChange({ ...config, ocrDetThresh: parseFloat(e.target.value) })}
+                    disabled={loading}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制OCR文本检测的灵敏度，较低值检测更多文本</small>
+                </div>
+                <div className="config-item">
+                  <label htmlFor="unclip-ratio">裁剪扩大倍数: {config.unclipRatio}</label>
+                  <input
+                    id="unclip-ratio"
+                    type="range"
+                    min="1.0"
+                    max="2.0"
+                    step="0.1"
+                    value={config.unclipRatio}
+                    onChange={(e) => onConfigChange({ ...config, unclipRatio: parseFloat(e.target.value) })}
+                    disabled={loading}
+                  />
+                  <div className="range-labels">
+                    <span>1.0</span>
+                    <span>2.0</span>
+                  </div>
+                  <small className="config-description">扩大裁剪区域以包含完整文本，类似PaddleOCR的unclip算法，默认1.1倍</small>
+                </div>
+              </>
             ) : (
               <>
                 <div className="config-item">
@@ -233,56 +287,8 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         )}
       </div>
 
-      {pageType !== 'ppstructure' && (
-        <div className="control-section">
-          <div 
-            className="config-section-header"
-            onClick={() => setDrawConfigExpanded(!drawConfigExpanded)}
-          >
-            <h4>绘制配置参数</h4>
-            <span className={`expand-icon ${drawConfigExpanded ? 'expanded' : ''}`}>▼</span>
-          </div>
-          {drawConfigExpanded && (
-            <div className="config-content">
-              <div className="config-item">
-                <label htmlFor="drop-score">绘制阈值: {config.dropScore}</label>
-                <input
-                  id="drop-score"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={config.dropScore}
-                  onChange={(e) => onConfigChange({ ...config, dropScore: parseFloat(e.target.value) })}
-                  disabled={loading}
-                />
-                <div className="range-labels">
-                  <span>0.0</span>
-                  <span>1.0</span>
-                </div>
-                <small className="config-description">控制绘制时显示的识别结果最低置信度</small>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      <div className="control-section">
-        <div className="button-group">
-          <button onClick={onUpload} disabled={loading || !file} className="control-btn primary-btn">
-            {loading ? '处理中...' : '开始识别'}
-          </button>
-          <button onClick={onClear} disabled={loading} className="control-btn secondary-btn">
-            清空
-          </button>
-        </div>
-        <div className="api-button-row">
-          <button onClick={onShowApiModal} className="control-btn info-btn">
-            📖 API文档
-          </button>
-        </div>
-        {error && <span className="error">{error}</span>}
-      </div>
+
     </aside>
   )
 }

@@ -32,8 +32,7 @@ async def analyze_structure(
     file: UploadFile = File(...),
     layout_conf_threshold: float = Form(0.5),
     ocr_det_db_thresh: float = Form(0.3),
-    ocr_cls_thresh: float = Form(0.9),
-    ocr_use_cls: bool = Form(True)
+    unclip_ratio: float = Form(1.1)
 ):
     """
     使用PP-StructureV3 Pipeline进行文档结构分析（返回layout格式）
@@ -41,9 +40,8 @@ async def analyze_structure(
     Args:
         file: 上传的图像文件
         layout_conf_threshold: 布局检测置信度阈值
-        ocr_det_db_thresh: OCR检测阈值（保留参数以保持兼容性）
-        ocr_cls_thresh: OCR分类阈值（保留参数以保持兼容性）
-        ocr_use_cls: 是否使用OCR分类（保留参数以保持兼容性）
+        ocr_det_db_thresh: OCR检测阈值（用于OCR文本识别）
+        unclip_ratio: 裁剪区域扩大倍数，默认1.1倍，用于包含更多上下文
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用，请检查依赖"})
@@ -91,9 +89,16 @@ async def analyze_structure(
         img = np.array(img)
 
         # Run structure analysis
-        result = pipeline.analyze_structure(img, layout_conf_threshold=layout_conf_threshold)
+        result = pipeline.analyze_structure(
+            img,
+            layout_conf_threshold=layout_conf_threshold,
+            ocr_conf_threshold=ocr_det_db_thresh,  # 使用检测阈值作为OCR阈值
+            unclip_ratio=unclip_ratio
+        )
 
-        return {"results": result["layout_regions"]}
+        print("Structure Analysis Result:", result)
+
+        return result
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -101,14 +106,14 @@ async def analyze_structure(
 @router.post("/draw")
 async def draw_structure_result(
     file: UploadFile = File(...),
-    layout_result: str = Form(...)
+    analysis_result: str = Form(...)
 ):
     """
-    绘制PP-StructureV3结果（layout格式）
+    绘制PP-StructureV3结果
 
     Args:
         file: 上传的图像文件
-        layout_result: 结构分析结果的JSON字符串（layout格式）
+        analysis_result: 完整结构分析结果的JSON字符串
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用"})
@@ -120,9 +125,9 @@ async def draw_structure_result(
         img = Image.open(io.BytesIO(contents)).convert("RGB")
         img = np.array(img)
 
-        # Parse structure result
-        structure_data = json.loads(layout_result)
-        result = structure_data.get("results", [])
+        # Parse analysis result
+        analysis_data = json.loads(analysis_result)
+        layout_regions = analysis_data.get("layout_regions", [])
 
         # Get pipeline for visualization
         pipeline = get_global_pipeline()
@@ -135,7 +140,7 @@ async def draw_structure_result(
                 return JSONResponse(status_code=500, content={"error": "模型加载失败"})
 
         # Visualize result
-        vis_image = pipeline.visualize(img, result)
+        vis_image = pipeline.visualize(img, layout_regions)
 
         # Convert to bytes
         import cv2
@@ -155,14 +160,14 @@ async def draw_structure_result(
 @router.post("/markdown")
 async def generate_markdown(
     file: UploadFile = File(...),
-    layout_result: str = Form(...)
+    analysis_result: str = Form(...)
 ):
     """
-    根据PP-StructureV3结果生成Markdown文档
+    根据PP-StructureV3完整分析结果生成Markdown文档
 
     Args:
         file: 上传的图像文件
-        layout_result: 结构分析结果的JSON字符串（layout格式）
+        analysis_result: 完整结构分析结果的JSON字符串
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用"})
@@ -174,9 +179,8 @@ async def generate_markdown(
         img = Image.open(io.BytesIO(contents)).convert("RGB")
         img_array = np.array(img)
 
-        # Parse structure result
-        structure_data = json.loads(layout_result)
-        layout_regions = structure_data.get("results", [])
+        # Parse analysis result
+        analysis_data = json.loads(analysis_result)
 
         # Get pipeline for markdown generation
         pipeline = get_global_pipeline()
@@ -188,11 +192,11 @@ async def generate_markdown(
             if not pipeline.load():
                 return JSONResponse(status_code=500, content={"error": "模型加载失败"})
 
-        # Delegate to pipeline to create a source-like markdown
+        # Delegate to pipeline to create markdown directly from analysis result
         try:
-            # First run structure analysis to get complete results
-            analysis_result = pipeline.analyze_structure(img_array, layout_conf_threshold=0.5)
-            result_md = pipeline.result_to_markdown(img_array, analysis_result)
+            result_md = pipeline.result_to_markdown(img_array, analysis_data)
+            print(f"Generated markdown length: {len(result_md.get('markdown', ''))}")
+            print(f"Markdown preview: {result_md.get('markdown', '')[:200]}")
             return result_md
         except Exception as e:
             return JSONResponse(status_code=500, content={"error": f"Failed to generate markdown: {str(e)}"})

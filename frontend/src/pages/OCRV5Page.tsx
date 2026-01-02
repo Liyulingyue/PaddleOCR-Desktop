@@ -11,7 +11,7 @@ function OCRV5Page() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [config, setConfig] = useState({ 
-    dropScore: 0.5,
+    dropScore: 0.0,
     detThresh: 0.3,
     clsThresh: 0.9,
     useCls: true
@@ -197,7 +197,7 @@ function OCRV5Page() {
                   <ul>
                     <li><code>file</code>: 原始文件（用于确定文件类型）</li>
                     <li><code>ocr_result</code>: OCR识别结果的JSON字符串</li>
-                    <li><code>drop_score</code>: 绘制阈值 (0.0-1.0，默认: 0.5)</li>
+                    <li><code>drop_score</code>: 绘制阈值 (0.0-1.0，默认: 0.0，0.0表示不过滤)</li>
                   </ul>
                   <h5>PDF文件处理说明：</h5>
                   <ul>

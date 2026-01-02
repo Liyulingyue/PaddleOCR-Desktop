@@ -34,6 +34,31 @@ except ImportError:
 
 router = APIRouter()
 
+def rotate_image(img, rotation_angle):
+    """
+    根据全局旋转角度旋转图像
+    
+    Args:
+        img: numpy数组格式的图像
+        rotation_angle: 旋转角度（度数）
+    
+    Returns:
+        numpy数组: 旋转后的图像
+    """
+    if rotation_angle == 0:
+        return img
+    
+    # 将numpy数组转换为PIL Image
+    pil_img = Image.fromarray(img)
+    
+    # 旋转图像（逆时针旋转rotation_angle度）
+    rotated_pil_img = pil_img.rotate(-rotation_angle, expand=True)
+    
+    # 转换回numpy数组
+    rotated_img = np.array(rotated_pil_img)
+    
+    return rotated_img
+
 def pdf_to_images_from_bytes(pdf_bytes, dpi=200):
     """将PDF字节数据转换为图像列表"""
     if not HAS_FITZ:
@@ -113,7 +138,7 @@ async def recognize(
             for page_idx, img in enumerate(images):
                 try:
                     # 使用pipeline进行OCR
-                    page_results = pipeline.ocr(img, conf_threshold=0.1)
+                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls)
 
                     # 直接返回pipeline格式
                     formatted_results = []
@@ -124,7 +149,8 @@ async def recognize(
                                 "text": result["text"],
                                 "text_confidence": float(result["confidence"]),
                                 "rotation": result["rotation"],
-                                "rotation_confidence": float(result["rotation_confidence"])
+                                "rotation_confidence": float(result["rotation_confidence"]),
+                                "text_direction": None  # 预留字段，用于将来添加文字方向信息
                             }
                             formatted_results.append(formatted_result)
 
@@ -145,7 +171,7 @@ async def recognize(
             img = np.array(img)
 
             # 使用pipeline进行OCR
-            results = pipeline.ocr(img, conf_threshold=0.1)
+            results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls)
 
             # 直接返回pipeline格式
             formatted_results = []
@@ -156,7 +182,8 @@ async def recognize(
                         "text": result["text"],
                         "text_confidence": float(result["confidence"]),
                         "rotation": result["rotation"],
-                        "rotation_confidence": float(result["rotation_confidence"])
+                        "rotation_confidence": float(result["rotation_confidence"]),
+                        "text_direction": None  # 预留字段，用于将来添加文字方向信息
                     }
                     formatted_results.append(formatted_result)
 
@@ -170,7 +197,7 @@ async def recognize(
 async def draw_ocr_result(
     file: UploadFile = File(...),
     ocr_result: str = Form(...),
-    drop_score: float = Form(0.5)
+    drop_score: float = Form(0.0)
 ):
     """
     绘制OCR结果（仅支持pipeline格式）
@@ -178,7 +205,7 @@ async def draw_ocr_result(
     Args:
         file: 上传的图像文件或PDF文件
         ocr_result: OCR结果的JSON字符串（pipeline格式）
-        drop_score: 丢弃分数阈值
+        drop_score: 丢弃分数阈值（0.0表示不过滤，默认0.0）
     """
     contents = await file.read()
     filename = file.filename.lower() if file.filename else ""
@@ -221,6 +248,11 @@ async def draw_ocr_result(
                     txts = []
                     scores = []
 
+                    # 提取该页的全局rotation角度
+                    page_rotation = 0
+                    if page_result and len(page_result) > 0 and isinstance(page_result[0], dict):
+                        page_rotation = page_result[0].get("rotation", 0)
+
                     for result in page_result:
                         if isinstance(result, dict) and "box" in result and "text" in result:
                             if result.get("text_confidence", 0) >= drop_score:
@@ -229,7 +261,11 @@ async def draw_ocr_result(
                                 scores.append(result.get("text_confidence", 0))
 
                     if boxes:
-                        drawn_img = draw_ocr(img, boxes, txts, scores, drop_score=drop_score)
+                        # 根据页面的rotation角度旋转图像
+                        rotated_img = rotate_image(img, page_rotation)
+                        
+                        # 在旋转后的图像上绘制OCR结果
+                        drawn_img = draw_ocr(rotated_img, boxes, txts, scores, drop_score=drop_score)
                         drawn_pages.append(drawn_img)
                     else:
                         drawn_pages.append(img)
@@ -264,6 +300,11 @@ async def draw_ocr_result(
             if "results" in ocr_data and isinstance(ocr_data["results"], list):
                 results = ocr_data["results"]
 
+                # 提取全局rotation角度
+                global_rotation = 0
+                if results and len(results) > 0 and isinstance(results[0], dict):
+                    global_rotation = results[0].get("rotation", 0)
+
                 # 转换为draw_ocr期望的格式
                 boxes = []
                 txts = []
@@ -277,7 +318,11 @@ async def draw_ocr_result(
                             scores.append(result.get("text_confidence", 0))
 
                 if boxes:
-                    drawn_img = draw_ocr(img_np, boxes, txts, scores, drop_score=drop_score)
+                    # 根据全局rotation角度旋转图像
+                    rotated_img = rotate_image(img_np, global_rotation)
+                    
+                    # 在旋转后的图像上绘制OCR结果
+                    drawn_img = draw_ocr(rotated_img, boxes, txts, scores, drop_score=drop_score)
                     # Convert to PIL Image
                     pil_img = Image.fromarray(drawn_img)
                     # Save to BytesIO

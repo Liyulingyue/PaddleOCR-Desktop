@@ -1,4 +1,4 @@
-nn./import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'

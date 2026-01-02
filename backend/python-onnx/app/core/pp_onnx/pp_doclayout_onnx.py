@@ -217,21 +217,59 @@ class PPDocLayoutONNX(ONNXModelBase):
         """
         vis_image = image.copy()
 
-        # Color map for different types
+        print(f"Visualizing {len(regions)} regions")
+        type_counts = {}
+        for region in regions:
+            region_type = region.get('type', 'unknown')
+            type_counts[region_type] = type_counts.get(region_type, 0) + 1
+        print(f"Region types: {type_counts}")
+
+        # Color map for different types - expanded to cover all PP-DocLayout classes
         colors = {
-            'text': (0, 255, 0),      # Green
-            'table': (255, 0, 0),     # Blue
-            'image': (0, 0, 255),     # Red
-            'formula': (255, 255, 0), # Cyan
-            'chart': (255, 0, 255),   # Magenta
-            'header': (0, 255, 255),  # Yellow
-            'footer': (128, 128, 128),# Gray
+            'text': (0, 255, 0),           # Green
+            'table': (255, 0, 0),          # Blue
+            'image': (0, 0, 255),          # Red
+            'formula': (255, 255, 0),      # Cyan
+            'chart': (255, 0, 255),        # Magenta
+            'header': (0, 255, 255),       # Yellow
+            'footer': (128, 128, 128),     # Gray
+            'paragraph_title': (255, 165, 0),    # Orange
+            'figure_title': (0, 255, 127),       # Spring Green
+            'table_title': (255, 20, 147),       # Deep Pink
+            'doc_title': (255, 215, 0),          # Gold
+            'chart_title': (255, 69, 0),         # Red Orange
+            'number': (0, 191, 255),             # Deep Sky Blue
+            'abstract': (138, 43, 226),          # Blue Violet
+            'content': (34, 139, 34),            # Forest Green
+            'reference': (255, 140, 0),          # Dark Orange
+            'footnote': (105, 105, 105),         # Dim Gray
+            'algorithm': (255, 99, 71),          # Tomato
+            'seal': (255, 105, 180),             # Hot Pink
+            'formula_number': (0, 206, 209),     # Dark Turquoise
+            'header_image': (186, 85, 211),      # Medium Orchid
+            'footer_image': (70, 130, 180),      # Steel Blue
+            'aside_text': (210, 105, 30),        # Chocolate
         }
 
+        drawn_count = 0
         for region in regions:
             bbox = region['bbox']
             label = region['type']
             conf = region['confidence']
+
+            # Validate bbox
+            if len(bbox) != 4:
+                print(f"Invalid bbox length for {label}: {bbox}")
+                continue
+
+            x1, y1, x2, y2 = bbox
+            if x2 <= x1 or y2 <= y1:
+                print(f"Invalid bbox coordinates for {label}: {bbox}")
+                continue
+
+            if x1 < 0 or y1 < 0 or x2 > image.shape[1] or y2 > image.shape[0]:
+                print(f"Bbox out of bounds for {label}: {bbox}, image shape: {image.shape}")
+                continue
 
             color = colors.get(label, (255, 255, 255))  # White for unknown
 
@@ -242,6 +280,10 @@ class PPDocLayoutONNX(ONNXModelBase):
             label_text = f"{label}: {conf:.2f}"
             cv2.putText(vis_image, label_text, (bbox[0], bbox[1] - 5),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+            drawn_count += 1
+
+        print(f"Successfully drew {drawn_count} out of {len(regions)} regions")
 
         if output_path:
             cv2.imwrite(output_path, vis_image)

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import JSZip from 'jszip'
 
 interface ResultPanelProps {
@@ -359,12 +361,33 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
             <pre>{JSON.stringify(result, null, 2)}</pre>
           ) : view === 'markdown' ? (
             <div className="markdown-content">
-              {markdownContent ? (
-                <div className="markdown-rendered">
-                  <ReactMarkdown>
-                    {processMarkdownContent(markdownContent)}
-                  </ReactMarkdown>
-                </div>
+      {markdownContent ? (
+        <div className="markdown-rendered">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              img: ({ src, alt, ...props }) => {
+                console.log('Image in markdown:', { src: src?.substring(0, 50) + '...', alt })
+                // 确保base64图片能正确渲染
+                if (src && src.startsWith('data:image/')) {
+                  return <img src={src} alt={alt || 'Image'} {...props} style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ddd', borderRadius: '4px' }} />
+                }
+                return <img src={src} alt={alt} {...props} />
+              }
+            }}
+            urlTransform={(url) => {
+              // 确保data URL被正确处理
+              if (url.startsWith('data:')) {
+                return url
+              }
+              return url
+            }}
+            skipHtml={false}
+          >
+            {processMarkdownContent(markdownContent)}
+          </ReactMarkdown>
+        </div>
               ) : (
                 <p>Loading markdown content...</p>
               )}
