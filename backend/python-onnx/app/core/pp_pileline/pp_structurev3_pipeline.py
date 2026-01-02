@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from ..pp_onnx.pp_doclayout_onnx import PPDocLayoutONNX
-from .pp_ocrv5_pipeline_new import PPOCRv5Pipeline
+from .pp_ocrv5_pipeline import PPOCRv5Pipeline
 
 
 class PPStructureV3Pipeline:

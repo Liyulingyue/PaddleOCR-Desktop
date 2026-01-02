@@ -11,9 +11,9 @@ Models provide a consistent interface for OCR tasks.
 """
 
 from .onnx_model_base import ONNXModelBase
-from .pp_ocrv5det_onnx_new import PPOCRv5DetONNX
-from .pp_ocrv5rec_onnx_new import PPOCRv5RecONNX
-from .pp_lcnet_doc_onnx_new import PPLCNetDocONNX
+from .pp_ocrv5det_onnx import PPOCRv5DetONNX
+from .pp_ocrv5rec_onnx import PPOCRv5RecONNX
+from .pp_lcnet_doc_onnx import PPLCNetDocONNX
 from .pp_doclayout_onnx import PPDocLayoutONNX
 
 __all__ = [

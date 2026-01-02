@@ -8,7 +8,7 @@ from ..core.utils import draw_ocr
 
 # 导入新的pipeline
 try:
-    from ..core.pp_pileline.pp_ocrv5_pipeline_new import PPOCRv5Pipeline
+    from ..core.pp_pileline.pp_ocrv5_pipeline import PPOCRv5Pipeline
     HAS_PIPELINE = True
 except ImportError:
     HAS_PIPELINE = False

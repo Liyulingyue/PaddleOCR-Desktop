@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import yaml
 
-from ..pp_onnx.pp_ocrv5det_onnx_new import PPOCRv5DetONNX
-from ..pp_onnx.pp_ocrv5rec_onnx_new import PPOCRv5RecONNX
-from ..pp_onnx.pp_lcnet_doc_onnx_new import PPLCNetDocONNX
+from ..pp_onnx.pp_ocrv5det_onnx import PPOCRv5DetONNX
+from ..pp_onnx.pp_ocrv5rec_onnx import PPOCRv5RecONNX
+from ..pp_onnx.pp_lcnet_doc_onnx import PPLCNetDocONNX
 
 
 class PPOCRv5Pipeline:
