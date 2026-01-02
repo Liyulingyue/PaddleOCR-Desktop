@@ -24,19 +24,12 @@
 pip install -r requirements.txt
 ```
 
-## 下载模型
+## 模型文件
 
-在使用服务之前，需要先下载PP-OCRv5模型文件：
-
-```bash
-python download_models.py
-```
-
-此脚本会从OnnxOCR项目的GitHub仓库下载以下模型文件：
-- `models/ppocrv5/det/det.onnx` - 文本检测模型
-- `models/ppocrv5/rec/rec.onnx` - 文本识别模型
-- `models/ppocrv5/cls/cls.onnx` - 文本方向分类模型
-- `models/ppocrv5/ppocrv5_dict.txt` - 字符字典文件
+项目已包含所需的PP-OCRv5 ONNX模型文件，位于 `models/` 目录下：
+- `models/PP-OCRv5_mobile_det-ONNX/inference.onnx` - 文本检测模型
+- `models/PP-OCRv5_mobile_rec-ONNX/inference.onnx` - 文本识别模型
+- `models/PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx` - 文本方向分类模型
 
 ## 运行服务
 
@@ -83,8 +76,8 @@ python run.py
 
 ## 注意事项
 
-- 首次运行前务必先执行 `python download_models.py` 下载模型
-- 模型文件较大，请确保网络连接稳定
+- 模型文件已包含在项目中，无需额外下载
+- 如需更新模型，请参考 `references/scripts/` 目录下的转换脚本
 ## 许可证
 
 本项目基于PaddlePaddle/PaddleOCR项目，遵循相应许可证。

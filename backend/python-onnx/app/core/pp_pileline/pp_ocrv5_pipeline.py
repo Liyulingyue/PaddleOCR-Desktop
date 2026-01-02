@@ -35,18 +35,19 @@ class PPOCRv5Pipeline:
             use_gpu: Whether to use GPU
             gpu_id: GPU device ID
         """
-        print("Initializing PP-OCRv5 Pipeline...")
+        # Store configuration, don't load models yet
+        self.det_model_path = det_model_path
+        self.rec_model_path = rec_model_path
+        self.cls_model_path = cls_model_path
+        self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
         
-        # Initialize orientation classifier
-        self.cls_model = PPLCNetDocONNX(model_path=cls_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
+        # Model instances (initialized in load())
+        self.cls_model = None
+        self.det_model = None
+        self.rec_model = None
         
-        # Initialize text detector
-        self.det_model = PPOCRv5DetONNX(model_path=det_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
-        
-        # Initialize text recognizer
-        self.rec_model = PPOCRv5RecONNX(model_path=rec_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
-        
-        print("PP-OCRv5 Pipeline initialized successfully!")
+        print("PP-OCRv5 Pipeline initialized (models not loaded yet). Call load() to load models.")
 
     def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True) -> List[Dict]:
         """
@@ -60,6 +61,11 @@ class PPOCRv5Pipeline:
         Returns:
             List of OCR results with text, bbox, confidence
         """
+        if not self.is_loaded():
+            print("PP-OCRv5 models not loaded, auto-loading...")
+            if not self.load():
+                raise RuntimeError("Failed to auto-load PP-OCRv5 models.")
+            
         if isinstance(image, str):
             image = cv2.imread(image)
             if image is None:
@@ -112,12 +118,34 @@ class PPOCRv5Pipeline:
     def load(self) -> bool:
         """
         Load the OCR pipeline models.
-        Since models are loaded in __init__, this always returns True.
         
         Returns:
-            bool: Always True since models are loaded at initialization
+            bool: True if loading successful, False otherwise
         """
-        return True
+        try:
+            if self.is_loaded():
+                print("Models already loaded")
+                return True
+            
+            print("Loading PP-OCRv5 Pipeline models...")
+            
+            # Initialize orientation classifier
+            self.cls_model = PPLCNetDocONNX(model_path=self.cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
+            
+            # Initialize text detector
+            self.det_model = PPOCRv5DetONNX(model_path=self.det_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
+            
+            # Initialize text recognizer
+            self.rec_model = PPOCRv5RecONNX(model_path=self.rec_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
+            
+            print("PP-OCRv5 Pipeline models loaded successfully!")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to load PPOCRv5Pipeline models: {e}")
+            # Clean up any partially loaded models
+            self.unload()
+            return False
 
     def unload(self) -> bool:
         """
@@ -168,6 +196,11 @@ class PPOCRv5Pipeline:
         Returns:
             Image with OCR results drawn
         """
+        if not self.is_loaded():
+            print("PP-OCRv5 models not loaded, auto-loading...")
+            if not self.load():
+                raise RuntimeError("Failed to auto-load PP-OCRv5 models.")
+            
         # First, apply the same rotation as in ocr()
         cls_result = self.cls_model.classify(image)
         angle = int(cls_result['angle'])
@@ -213,7 +246,14 @@ class PPOCRv5Pipeline:
         Returns:
             Dictionary with model configurations
         """
+        if not self.is_loaded():
+            return {
+                'status': 'not_loaded',
+                'message': 'Models not loaded yet. Call load() first.'
+            }
+            
         return {
+            'status': 'loaded',
             'orientation_model': self.cls_model.get_config_info(),
             'detection_model': self.det_model.get_config_info(),
             'recognition_model': self.rec_model.get_config_info()
@@ -233,6 +273,11 @@ def main():
     
     # Initialize pipeline
     pipeline = PPOCRv5Pipeline()
+    
+    # Load models
+    if not pipeline.load():
+        print("Failed to load models")
+        return
     
     # Load image
     image = cv2.imread(image_path)

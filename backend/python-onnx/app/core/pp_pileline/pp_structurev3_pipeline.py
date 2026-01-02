@@ -150,7 +150,9 @@ class PPStructureV3Pipeline:
             Dict[str, Any]: 分析结果
         """
         if not self._loaded:
-            raise RuntimeError("Models not loaded. Call load() first.")
+            print("Models not loaded, auto-loading...")
+            if not self.load():
+                raise RuntimeError("Failed to auto-load models.")
 
         # 预处理图像
         if isinstance(image, str):
