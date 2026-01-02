@@ -1,0 +1,214 @@
+"""
+PP-OCRv5 Complete Pipeline ONNX Inference
+Integrates document orientation detection, text detection, and text recognition
+"""
+
+import cv2
+import numpy as np
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional
+import yaml
+
+from ..pp_onnx.pp_ocrv5det_onnx_new import PPOCRv5DetONNX
+from ..pp_onnx.pp_ocrv5rec_onnx_new import PPOCRv5RecONNX
+from ..pp_onnx.pp_lcnet_doc_onnx_new import PPLCNetDocONNX
+
+
+class PPOCRv5Pipeline:
+    """
+    Complete PP-OCRv5 Pipeline integrating orientation detection, text detection, and recognition
+    """
+    
+    def __init__(self, 
+                 det_model_path: str = None,
+                 rec_model_path: str = None, 
+                 cls_model_path: str = None,
+                 use_gpu: bool = False, 
+                 gpu_id: int = 0):
+        """
+        Initialize the complete PP-OCRv5 pipeline
+        
+        Args:
+            det_model_path: Path to detection model (optional, uses default)
+            rec_model_path: Path to recognition model (optional, uses default)
+            cls_model_path: Path to classification model (optional, uses default)
+            use_gpu: Whether to use GPU
+            gpu_id: GPU device ID
+        """
+        print("Initializing PP-OCRv5 Pipeline...")
+        
+        # Initialize orientation classifier
+        self.cls_model = PPLCNetDocONNX(model_path=cls_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
+        
+        # Initialize text detector
+        self.det_model = PPOCRv5DetONNX(model_path=det_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
+        
+        # Initialize text recognizer
+        self.rec_model = PPOCRv5RecONNX(model_path=rec_model_path, use_gpu=use_gpu, gpu_id=gpu_id)
+        
+        print("PP-OCRv5 Pipeline initialized successfully!")
+
+    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True) -> List[Dict]:
+        """
+        Run complete OCR pipeline on input image
+        
+        Args:
+            image: Input image (BGR format)
+            conf_threshold: Confidence threshold for detection and recognition
+            use_close: Whether to use morphological closing in detection
+            
+        Returns:
+            List of OCR results with text, bbox, confidence
+        """
+        if isinstance(image, str):
+            image = cv2.imread(image)
+            if image is None:
+                raise ValueError(f"Could not load image from {image}")
+        
+        # Step 1: Document orientation detection
+        cls_result = self.cls_model.classify(image)
+        angle = int(cls_result['angle'])
+        
+        # Step 2: Rotate image based on detected angle
+        if angle == 90:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif angle == 180:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_180)
+        elif angle == 270:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            rotated_image = image.copy()
+        
+        # Step 3: Text detection on rotated image
+        detections = self.det_model.detect(rotated_image, conf_threshold=conf_threshold, use_close=use_close)
+        
+        # Step 4: Text recognition for each detected region
+        results = []
+        for det in detections:
+            bbox = det['bbox']
+            x1, y1, x2, y2 = bbox
+            
+            # Crop text region
+            cropped = rotated_image[y1:y2, x1:x2]
+            if cropped.size == 0:
+                continue
+            
+            # Recognize text
+            rec_result = self.rec_model.recognize(cropped, conf_threshold=conf_threshold)
+            
+            # Combine results
+            result = {
+                'text': rec_result['text'],
+                'bbox': bbox,
+                'confidence': rec_result['confidence'],
+                'text_region_confidence': det['confidence'],
+                'rotation': angle,
+                'rotation_confidence': cls_result['confidence']
+            }
+            results.append(result)
+        
+        return results
+
+    def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None) -> np.ndarray:
+        """
+        Visualize OCR results on image
+        
+        Args:
+            image: Original input image
+            results: OCR results from ocr() method
+            output_path: Path to save visualization (optional)
+            
+        Returns:
+            Image with OCR results drawn
+        """
+        # First, apply the same rotation as in ocr()
+        cls_result = self.cls_model.classify(image)
+        angle = int(cls_result['angle'])
+        
+        if angle == 90:
+            vis_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif angle == 180:
+            vis_image = cv2.rotate(image, cv2.ROTATE_180)
+        elif angle == 270:
+            vis_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            vis_image = image.copy()
+        
+        # Draw results
+        for result in results:
+            bbox = result['bbox']
+            text = result['text']
+            conf = result['confidence']
+            
+            # Draw bounding box
+            cv2.rectangle(vis_image, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
+            
+            # Draw text
+            label = f"{text} ({conf:.2f})"
+            cv2.putText(vis_image, label, (bbox[0], bbox[1] - 5),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        
+        # Add orientation info
+        orientation_text = f"Orientation: {angle}°"
+        cv2.putText(vis_image, orientation_text, (10, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        
+        if output_path:
+            cv2.imwrite(output_path, vis_image)
+            print(f"Visualization saved to {output_path}")
+        
+        return vis_image
+
+    def get_pipeline_info(self) -> Dict:
+        """
+        Get information about all models in the pipeline
+        
+        Returns:
+            Dictionary with model configurations
+        """
+        return {
+            'orientation_model': self.cls_model.get_config_info(),
+            'detection_model': self.det_model.get_config_info(),
+            'recognition_model': self.rec_model.get_config_info()
+        }
+
+
+def main():
+    """Example usage of PP-OCRv5 Pipeline"""
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python pp_ocrv5_pipeline_new.py <image_path> [output_path]")
+        return
+    
+    image_path = sys.argv[1]
+    output_path = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    # Initialize pipeline
+    pipeline = PPOCRv5Pipeline()
+    
+    # Load image
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"Could not load image: {image_path}")
+        return
+    
+    # Run OCR
+    results = pipeline.ocr(image, conf_threshold=0.5)
+    
+    print(f"Found {len(results)} text regions:")
+    for i, result in enumerate(results):
+        print(f"  Region {i}: '{result['text']}' (conf: {result['confidence']:.2f})")
+    
+    # Visualize
+    if output_path:
+        vis_image = pipeline.visualize(image, results, output_path)
+    else:
+        vis_image = pipeline.visualize(image, results)
+        cv2.imshow("PP-OCRv5 Pipeline Results", vis_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()

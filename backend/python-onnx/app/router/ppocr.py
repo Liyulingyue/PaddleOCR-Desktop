@@ -8,7 +8,7 @@ from ..core.utils import draw_ocr
 
 # 导入新的pipeline
 try:
-    from ..core.pp_pileline.pp_ocrv5_pipeline import PPOCRv5Pipeline
+    from ..core.pp_pileline.pp_ocrv5_pipeline_new import PPOCRv5Pipeline
     HAS_PIPELINE = True
 except ImportError:
     HAS_PIPELINE = False
@@ -78,14 +78,13 @@ async def recognize(
     try:
         # 获取模型路径
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "ppocrv5"
-        det_model = models_dir / "det" / "det.onnx"
-        rec_model = models_dir / "rec" / "rec.onnx"
-        cls_model = models_dir / "cls" / "cls.onnx"
-        dict_path = models_dir / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         # 检查模型文件是否存在
-        if not all([det_model.exists(), rec_model.exists(), cls_model.exists(), dict_path.exists()]):
+        if not all([det_model.exists(), rec_model.exists(), cls_model.exists()]):
             return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
 
         # 获取或创建pipeline实例
@@ -95,7 +94,6 @@ async def recognize(
                 det_model_path=str(det_model),
                 rec_model_path=str(rec_model),
                 cls_model_path=str(cls_model),
-                rec_char_dict_path=str(dict_path),
                 use_gpu=False
             )
             set_global_pipeline(pipeline)
@@ -115,16 +113,16 @@ async def recognize(
             for page_idx, img in enumerate(images):
                 try:
                     # 使用pipeline进行OCR
-                    page_results = pipeline.ocr(img, det=True, rec=True, cls=use_cls)
+                    page_results = pipeline.ocr(img, conf_threshold=0.1)
 
                     # 直接返回pipeline格式
                     formatted_results = []
                     for result in page_results:
-                        if result['text_confidence'] >= 0.1:  # 过滤低置信度结果
+                        if result['confidence'] >= 0.1:  # 过滤低置信度结果
                             formatted_result = {
-                                "box": result["box"],
+                                "box": result["bbox"],
                                 "text": result["text"],
-                                "text_confidence": float(result["text_confidence"]),
+                                "text_confidence": float(result["confidence"]),
                                 "rotation": result["rotation"],
                                 "rotation_confidence": float(result["rotation_confidence"])
                             }
@@ -147,16 +145,16 @@ async def recognize(
             img = np.array(img)
 
             # 使用pipeline进行OCR
-            results = pipeline.ocr(img, det=True, rec=True, cls=use_cls)
+            results = pipeline.ocr(img, conf_threshold=0.1)
 
             # 直接返回pipeline格式
             formatted_results = []
             for result in results:
-                if result['text_confidence'] >= 0.1:  # 过滤低置信度结果
+                if result['confidence'] >= 0.1:  # 过滤低置信度结果
                     formatted_result = {
-                        "box": result["box"],
+                        "box": result["bbox"],
                         "text": result["text"],
-                        "text_confidence": float(result["text_confidence"]),
+                        "text_confidence": float(result["confidence"]),
                         "rotation": result["rotation"],
                         "rotation_confidence": float(result["rotation_confidence"])
                     }
@@ -346,13 +344,12 @@ async def load_model():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "ppocrv5"
-        det_model = models_dir / "det" / "det.onnx"
-        rec_model = models_dir / "rec" / "rec.onnx"
-        cls_model = models_dir / "cls" / "cls.onnx"
-        dict_path = models_dir / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
-        if not all([det_model.exists(), rec_model.exists(), cls_model.exists(), dict_path.exists()]):
+        if not all([det_model.exists(), rec_model.exists(), cls_model.exists()]):
             return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
 
         # 获取或创建全局pipeline实例
@@ -362,7 +359,6 @@ async def load_model():
                 det_model_path=str(det_model),
                 rec_model_path=str(rec_model),
                 cls_model_path=str(cls_model),
-                rec_char_dict_path=str(dict_path),
                 use_gpu=False
             )
             set_global_pipeline(pipeline)
@@ -403,13 +399,12 @@ async def model_status():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "ppocrv5"
-        det_model = models_dir / "det" / "det.onnx"
-        rec_model = models_dir / "rec" / "rec.onnx"
-        cls_model = models_dir / "cls" / "cls.onnx"
-        dict_path = models_dir / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
-        models_exist = all([det_model.exists(), rec_model.exists(), cls_model.exists(), dict_path.exists()])
+        models_exist = all([det_model.exists(), rec_model.exists(), cls_model.exists()])
 
         if not models_exist:
             return {

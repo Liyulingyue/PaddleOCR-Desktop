@@ -26,8 +26,8 @@ class PPDocLayoutONNX(ONNXModelBase):
         if model_path is None:
             # Default path relative to project root
             import os
-            project_root = Path(__file__).parent.parent.parent.parent.parent  # backend/python-onnx/app/core -> project root
-            model_path = project_root / 'backend' / 'python-onnx' / 'models' / 'pp_structure_v3' / 'PP-DocLayout-L' / 'inference.onnx'
+            project_root = Path(__file__).parent.parent.parent.parent  # backend/python-onnx/app/core -> project root
+            model_path = project_root / 'models' / 'PP-DocLayout-L-ONNX' / 'inference.onnx'
 
         self.model_path = Path(model_path)
         self.yml_path = self.model_path.parent / 'inference.yml'

@@ -58,15 +58,14 @@ async def analyze_structure(
     try:
         # 获取模型路径
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "pp_structure_v3"
-        layout_model_path = models_dir / "PP-DocLayout-L" / "inference.onnx"
-        ocr_det_model = models_dir.parent / "ppocrv5" / "det" / "det.onnx"
-        ocr_rec_model = models_dir.parent / "ppocrv5" / "rec" / "rec.onnx"
-        ocr_cls_model = models_dir.parent / "ppocrv5" / "cls" / "cls.onnx"
-        ocr_dict_path = models_dir.parent / "ppocrv5" / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        layout_model_path = models_dir / "PP-DocLayout-L-ONNX" / "inference.onnx"
+        ocr_det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         # 检查模型文件是否存在
-        if not all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists(), ocr_dict_path.exists()]):
+        if not all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()]):
             return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
 
         # 获取或创建pipeline实例
@@ -77,7 +76,6 @@ async def analyze_structure(
                 ocr_det_model_path=str(ocr_det_model),
                 ocr_rec_model_path=str(ocr_rec_model),
                 ocr_cls_model_path=str(ocr_cls_model),
-                ocr_rec_char_dict_path=str(ocr_dict_path),
                 use_gpu=False,
                 gpu_id=0
             )
@@ -213,14 +211,13 @@ async def load_model():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "pp_structure_v3"
-        layout_model_path = models_dir / "PP-DocLayout-L" / "inference.onnx"
-        ocr_det_model = models_dir.parent / "ppocrv5" / "det" / "det.onnx"
-        ocr_rec_model = models_dir.parent / "ppocrv5" / "rec" / "rec.onnx"
-        ocr_cls_model = models_dir.parent / "ppocrv5" / "cls" / "cls.onnx"
-        ocr_dict_path = models_dir.parent / "ppocrv5" / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        layout_model_path = models_dir / "PP-DocLayout-L-ONNX" / "inference.onnx"
+        ocr_det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
-        if not all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists(), ocr_dict_path.exists()]):
+        if not all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()]):
             return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
 
         # 获取或创建全局pipeline实例
@@ -231,7 +228,6 @@ async def load_model():
                 ocr_det_model_path=str(ocr_det_model),
                 ocr_rec_model_path=str(ocr_rec_model),
                 ocr_cls_model_path=str(ocr_cls_model),
-                ocr_rec_char_dict_path=str(ocr_dict_path),
                 use_gpu=False
             )
             set_global_pipeline(pipeline)
@@ -272,14 +268,13 @@ async def model_status():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models" / "pp_structure_v3"
-        layout_model_path = models_dir / "PP-DocLayout-L" / "inference.onnx"
-        ocr_det_model = models_dir.parent / "ppocrv5" / "det" / "det.onnx"
-        ocr_rec_model = models_dir.parent / "ppocrv5" / "rec" / "rec.onnx"
-        ocr_cls_model = models_dir.parent / "ppocrv5" / "cls" / "cls.onnx"
-        ocr_dict_path = models_dir.parent / "ppocrv5" / "ppocrv5_dict.txt"
+        models_dir = Path(__file__).parent.parent.parent / "models"
+        layout_model_path = models_dir / "PP-DocLayout-L-ONNX" / "inference.onnx"
+        ocr_det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
-        models_exist = all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists(), ocr_dict_path.exists()])
+        models_exist = all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()])
 
         if not models_exist:
             return {

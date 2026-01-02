@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from ..pp_onnx.pp_doclayout_onnx import PPDocLayoutONNX
-from .pp_ocrv5_pipeline import PPOCRv5Pipeline
+from .pp_ocrv5_pipeline_new import PPOCRv5Pipeline
 
 
 class PPStructureV3Pipeline:
@@ -59,10 +59,8 @@ class PPStructureV3Pipeline:
             det_model_path=ocr_det_model_path,
             rec_model_path=ocr_rec_model_path,
             cls_model_path=ocr_cls_model_path,
-            rec_char_dict_path=ocr_rec_char_dict_path,
             use_gpu=use_gpu,
-            gpu_id=gpu_id,
-            **(ocr_config or {})
+            gpu_id=gpu_id
         )
 
         # 模型实例
@@ -249,20 +247,20 @@ class PPStructureV3Pipeline:
         """
         try:
             # 使用OCR流水线进行完整的OCR处理
-            ocr_results = self.ocr_pipeline.ocr(image, det=True, rec=True, cls=True)
+            ocr_results = self.ocr_pipeline.ocr(image, conf_threshold=conf_threshold)
 
             if not ocr_results:
                 return None
 
             # 过滤低置信度的结果
-            valid_results = [r for r in ocr_results if r.get('text_confidence', 0) >= conf_threshold]
+            valid_results = [r for r in ocr_results if r.get('confidence', 0) >= conf_threshold]
 
             if not valid_results:
                 return None
 
             # 合并所有文本
             text_lines = [r['text'] for r in valid_results]
-            avg_confidence = sum(r['text_confidence'] for r in valid_results) / len(valid_results)
+            avg_confidence = sum(r['confidence'] for r in valid_results) / len(valid_results)
 
             return {
                 'text': ' '.join(text_lines),

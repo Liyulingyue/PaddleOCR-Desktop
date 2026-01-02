@@ -45,9 +45,9 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "modelscope_id": "Liyulingyue/PP-DocLayout-S-ONNX",
         "local_path": "models/PP-DocLayout-S-ONNX",
     },
-    "PP-DocLayout-plus-L-ONNX": {
-        "modelscope_id": "Liyulingyue/PP-DocLayout-plus-L-ONNX",
-        "local_path": "models/PP-DocLayout-plus-L-ONNX",
+    "PP-DocLayout_plus-L-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-DocLayout_plus-L-ONNX",
+        "local_path": "models/PP-DocLayout_plus-L-ONNX",
     },
 
     # PP-OCRv5 系列（移动/服务器版本）
