@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
@@ -14,13 +14,16 @@ function OCRV5Page() {
     dropScore: 0.0,
     detThresh: 0.3,
     clsThresh: 0.9,
-    useCls: true
+    useCls: true,
+    mergeOverlaps: false,
+    overlapThreshold: 0.9
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
   const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
 
-  // 获取API基础URL
+  // 用于管理消息自动清除的定时器
+  const messageTimerRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     const fetchApiUrl = async () => {
       try {
@@ -33,12 +36,32 @@ function OCRV5Page() {
     fetchApiUrl()
   }, [])
 
-  // 自动清除全局消息（例如：加载/卸载提示）
+  // 设置消息并自动清除的函数
+  const setMessageWithAutoClear = (newMessage: string | null, duration: number = 5000) => {
+    // 清除之前的定时器
+    if (messageTimerRef.current) {
+      clearTimeout(messageTimerRef.current)
+    }
+    
+    setMessage(newMessage)
+    
+    // 如果有新消息，设置定时器自动清除
+    if (newMessage) {
+      messageTimerRef.current = setTimeout(() => {
+        setMessage(null)
+        messageTimerRef.current = null
+      }, duration)
+    }
+  }
+
+  // 组件卸载时清除定时器
   useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(() => setMessage(null), 1000)
-    return () => clearTimeout(timer)
-  }, [message, setMessage])
+    return () => {
+      if (messageTimerRef.current) {
+        clearTimeout(messageTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile)
@@ -51,6 +74,8 @@ function OCRV5Page() {
     detThresh: number
     clsThresh: number
     useCls: boolean
+    mergeOverlaps: boolean
+    overlapThreshold: number
   }) => {
     setConfig(newConfig)
   }
@@ -76,6 +101,8 @@ function OCRV5Page() {
       formData.append('det_db_thresh', config.detThresh.toString())
       formData.append('cls_thresh', config.clsThresh.toString())
       formData.append('use_cls', config.useCls.toString())
+      formData.append('merge_overlaps', config.mergeOverlaps.toString())
+      formData.append('overlap_threshold', config.overlapThreshold.toString())
 
       // Fetch OCR result
       const response = await fetch(`${apiBaseUrl}/api/ocr`, {
@@ -100,21 +127,59 @@ function OCRV5Page() {
       })
       if (drawResponse.ok) {
         const contentType = drawResponse.headers.get('content-type')
-        if (contentType && contentType.startsWith('image/')) {
-          // 单张图片（用于普通图像文件）
-          const blob = await drawResponse.blob()
-          const imageUrl = URL.createObjectURL(blob)
-          setDrawnImage(imageUrl)
-        } else {
-          // 多张图片（用于PDF文件）
-          const drawData = await drawResponse.json()
-          if (drawData.result && Array.isArray(drawData.result)) {
-            // 将多张图片拼接成一个大的base64字符串数组
-            setDrawnImage(drawData.result)
+        console.log('Draw response content-type:', contentType)
+        console.log('Draw response status:', drawResponse.status)
+        
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            // 多页PDF - 返回JSON格式的图片列表
+            const drawData = await drawResponse.json()
+            console.log('Draw data received (JSON):', {
+              file_type: drawData.file_type,
+              total_pages: drawData.total_pages,
+              processed_pages: drawData.processed_pages,
+              max_pages_limit: drawData.max_pages_limit,
+              images_count: drawData.images?.length
+            })
+            
+            if (drawData.file_type === 'pdf' && Array.isArray(drawData.images)) {
+              console.log(`Processing ${drawData.images.length} images for PDF`)
+              const drawImages = drawData.images.map((img: any, idx: number) => {
+                console.log(`Image ${idx + 1}: page_number=${img.page_number}, data_length=${img.data?.length || 0}`)
+                return `data:image/png;base64,${img.data}`
+              })
+              console.log(`Setting ${drawImages.length} images`)
+              
+              // 显示处理信息
+              const totalPages = drawData.total_pages || 0
+              const processedPages = drawData.processed_pages || 0
+              const maxLimit = drawData.max_pages_limit || 0
+              
+              let messageText = ''
+              if (totalPages > processedPages) {
+                messageText = `已处理并显示前${processedPages}页OCR绘制结果（共${totalPages}页，限制${maxLimit}页）`
+              } else if (totalPages > maxLimit) {
+                messageText = `已处理并显示${processedPages}页OCR绘制结果（共${totalPages}页，达到${maxLimit}页限制）`
+              } else {
+                messageText = `已处理并显示所有${processedPages}页OCR绘制结果`
+              }
+              
+              setMessageWithAutoClear(messageText)
+              
+              setDrawnImage(drawImages)
+            }
+          } else {
+            // 单页或图像文件 - blob格式（PNG图片流）
+            console.log('Processing as blob (single image)')
+            const blob = await drawResponse.blob()
+            const imageUrl = URL.createObjectURL(blob)
+            setDrawnImage(imageUrl)
           }
+        } catch (parseError) {
+          console.error('Error parsing draw response:', parseError)
         }
       } else {
-        console.error('Failed to fetch drawn image')
+        console.error('Failed to fetch drawn image:', drawResponse.status, drawResponse.statusText)
       }
     } catch (err) {
       setError('网络错误')
@@ -142,7 +207,7 @@ function OCRV5Page() {
         onConfigChange={handleConfigChange}
         onShowApiModal={() => setShowApiModal(true)}
         apiBaseUrl={apiBaseUrl}
-        onMessage={setMessage}
+        onMessage={setMessageWithAutoClear}
       />
 
       <Viewer file={file} />
@@ -175,6 +240,8 @@ function OCRV5Page() {
                     <li><code>det_db_thresh</code>: 检测阈值 (0.0-1.0，默认: 0.3)</li>
                     <li><code>cls_thresh</code>: 分类阈值 (0.0-1.0，默认: 0.9)</li>
                     <li><code>use_cls</code>: 是否使用文本方向分类 (true/false，默认: true)</li>
+                    <li><code>merge_overlaps</code>: 是否合并重叠的文本框 (true/false，默认: false)</li>
+                    <li><code>overlap_threshold</code>: 合并重叠框的重叠度阈值 (0.0-1.0，默认: 0.9)</li>
                   </ul>
                   <h5>PDF文件处理说明：</h5>
                   <ul>

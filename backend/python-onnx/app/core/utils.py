@@ -174,7 +174,17 @@ def draw_ocr(
     for i in range(box_num):
         if scores is not None and (scores[i] < drop_score or math.isnan(scores[i])):
             continue
-        box = np.reshape(np.array(boxes[i]), [-1, 1, 2]).astype(np.int64)
+        box_array = np.array(boxes[i])
+        if len(box_array) == 4:
+            # 矩形格式 [x1,y1,x2,y2] -> 转换为四边形
+            x1, y1, x2, y2 = box_array
+            box = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.int32)
+        elif len(box_array) == 8:
+            # 四边形格式 [x1,y1,x2,y2,x3,y3,x4,y4] -> 直接reshape
+            box = box_array.reshape(4, 2).astype(np.int32)
+        else:
+            # 其他格式，使用原来的方法
+            box = np.reshape(box_array, [-1, 1, 2]).astype(np.int64)
         image = cv2.polylines(np.array(image), [box], True, (255, 0, 0), 2)
     if txts is not None:
         img = np.array(resize_img(image, input_size=600))

@@ -56,6 +56,15 @@ class PPStructureV3Pipeline:
         self.layout_config = layout_config or {}
 
         # 创建OCR流水线实例
+        # 注意：这里复用了完整的PPOCRv5Pipeline，主要目的是获取其方向检测模型(cls_model)
+        # 这种设计基于以下考虑：
+        # 1. 效率：避免重复创建和加载方向检测模型，节省内存和初始化时间
+        # 2. 一致性：确保PPStructure和OCR使用相同的方向检测逻辑和模型
+        # 3. 简化：PPStructureV3Pipeline无需关心方向检测模型的创建细节
+        # 
+        # 然而，这种耦合并非必需。理论上，可以将方向检测模型从PPOCRv5Pipeline中拆分出来，
+        # 作为独立的组件，这样PPStructureV3Pipeline可以更灵活地控制模型生命周期，
+        # 例如只在需要时加载方向检测模型，或者使用不同的方向检测实现。
         self.ocr_pipeline = PPOCRv5Pipeline(
             det_model_path=ocr_det_model_path,
             rec_model_path=ocr_rec_model_path,
@@ -129,6 +138,96 @@ class PPStructureV3Pipeline:
         """
         return self._loaded and self.ocr_pipeline.is_loaded()
 
+    @staticmethod
+    def calculate_overlap_ratio(box1: List[float], box2: List[float]) -> float:
+        """Calculate overlap ratio as intersection / min(area1, area2)."""
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        # Calculate intersection
+        x1_inter = max(x1_1, x1_2)
+        y1_inter = max(y1_1, y1_2)
+        x2_inter = min(x2_1, x2_2)
+        y2_inter = min(y2_1, y2_2)
+        
+        # Check if there's no intersection
+        if x2_inter <= x1_inter or y2_inter <= y1_inter:
+            return 0.0
+        
+        # Calculate areas
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        inter_area = (x2_inter - x1_inter) * (y2_inter - y1_inter)
+        
+        # Calculate overlap ratio: intersection / min(area1, area2)
+        min_area = min(area1, area2)
+        if min_area == 0:
+            return 0.0
+            
+        return inter_area / min_area
+
+    @staticmethod
+    def merge_boxes(box1: List[float], box2: List[float]) -> List[float]:
+        """Merge two bounding boxes by taking the union."""
+        x1 = min(box1[0], box2[0])
+        y1 = min(box1[1], box2[1])
+        x2 = max(box1[2], box2[2])
+        y2 = max(box1[3], box2[3])
+        return [x1, y1, x2, y2]
+
+    def merge_layout_regions(self, layout_regions: List[Dict], overlap_threshold: float = 0.5) -> List[Dict]:
+        """
+        Merge overlapping layout detection regions with the same label.
+        
+        Args:
+            layout_regions: List of layout regions with bbox and type information
+            overlap_threshold: Overlap threshold for merging (intersection / min(area1, area2))
+            
+        Returns:
+            List of merged layout regions
+        """
+        if not layout_regions:
+            return layout_regions
+        
+        # Sort regions by confidence (highest first)
+        sorted_regions = sorted(layout_regions, key=lambda x: x.get('confidence', 0), reverse=True)
+        merged_regions = []
+        
+        for region in sorted_regions:
+            current_bbox = region.get('bbox', [])
+            current_type = region.get('type', '')
+            should_merge = False
+            
+            # Check against already merged regions with same type
+            for i, merged_region in enumerate(merged_regions):
+                merged_bbox = merged_region.get('bbox', [])
+                merged_type = merged_region.get('type', '')
+                
+                # Only merge if types are the same
+                if current_type == merged_type:
+                    overlap_ratio = self.calculate_overlap_ratio(current_bbox, merged_bbox)
+                    
+                    if overlap_ratio >= overlap_threshold:
+                        # Merge the boxes
+                        new_bbox = self.merge_boxes(current_bbox, merged_bbox)
+                        
+                        # Update merged region
+                        # Keep the one with higher confidence
+                        if region.get('confidence', 0) > merged_region.get('confidence', 0):
+                            merged_region['confidence'] = region.get('confidence', 0)
+                        
+                        # Update bbox
+                        merged_region['bbox'] = new_bbox
+                        
+                        should_merge = True
+                        break
+            
+            # If not merged with any existing region, add as new
+            if not should_merge:
+                merged_regions.append(region.copy())
+        
+        return merged_regions
+
     def analyze_structure(
         self,
         image: Union[str, np.ndarray],
@@ -136,6 +235,8 @@ class PPStructureV3Pipeline:
         layout_iou_threshold: float = 0.5,
         ocr_conf_threshold: float = 0.5,
         unclip_ratio: float = 1.1,
+        use_cls: bool = True,
+        cls_thresh: float = 0.9,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -147,6 +248,8 @@ class PPStructureV3Pipeline:
             layout_iou_threshold: 布局检测IOU阈值
             ocr_conf_threshold: OCR置信度阈值
             unclip_ratio: 裁剪区域扩大倍数，默认1.1倍，用于包含更多上下文
+            use_cls: 是否启用文档方向检测
+            cls_thresh: 方向检测置信度阈值
             **kwargs: 其他参数
 
         Returns:
@@ -163,6 +266,37 @@ class PPStructureV3Pipeline:
             if image is None:
                 raise ValueError(f"Failed to load image from {image}")
 
+        # 步骤0: 文档方向检测（可选）
+        # 注意：这里复用了PPOCRv5Pipeline中已创建的方向检测模型(cls_model)
+        # 这种设计基于效率考虑，避免重复加载相同的方向检测模型
+        # 但实际上，方向检测模型可以从PPOCRv5Pipeline中拆分出来，
+        # 作为独立的组件，这样PPStructureV3Pipeline可以更灵活地控制模型生命周期
+        angle = 0
+        rotation_confidence = 1.0
+        if use_cls:
+            cls_result = self.ocr_pipeline.cls_model.classify(image)
+            if cls_result['confidence'] >= cls_thresh:
+                angle = int(cls_result['angle'])
+                rotation_confidence = cls_result['confidence']
+            else:
+                # 置信度低，假设不需要旋转
+                angle = 0
+                rotation_confidence = 1.0
+        else:
+            # 跳过分类，假设不需要旋转
+            angle = 0
+            rotation_confidence = 1.0
+
+        # 步骤1: 根据检测到的角度旋转图像
+        if angle == 90:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif angle == 180:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_180)
+        elif angle == 270:
+            rotated_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            rotated_image = image.copy()
+
         # # 创建输出目录用于保存裁剪的图像片段
         # import os
         # from datetime import datetime
@@ -173,14 +307,23 @@ class PPStructureV3Pipeline:
 
         # region_counter = 0
 
-        # 步骤1: 布局检测
+        # 步骤2: 布局检测
         layout_regions = self.layout_model.detect(
-            image,
+            rotated_image,
             conf_threshold=layout_conf_threshold
         )
 
+        # 可选：合并重叠的布局区域（仅当类型相同时）
+        merge_layout = kwargs.get('merge_layout', False)
+        layout_overlap_threshold = kwargs.get('layout_overlap_threshold', 0.5)
+        if merge_layout and layout_regions:
+            layout_regions = self.merge_layout_regions(layout_regions, layout_overlap_threshold)
+
         results = {
             'image_shape': image.shape,
+            'rotated_image_shape': rotated_image.shape,
+            'rotation': angle,
+            'rotation_confidence': rotation_confidence,
             'layout_regions': layout_regions,
             'text_regions': [],
             'table_regions': [],
@@ -215,14 +358,14 @@ class PPStructureV3Pipeline:
                 # Get bounding box of expanded polygon
                 crop_x1 = max(0, int(np.min(expanded_points[:, 0])))
                 crop_y1 = max(0, int(np.min(expanded_points[:, 1])))
-                crop_x2 = min(image.shape[1], int(np.max(expanded_points[:, 0])))
-                crop_y2 = min(image.shape[0], int(np.max(expanded_points[:, 1])))
+                crop_x2 = min(rotated_image.shape[1], int(np.max(expanded_points[:, 0])))
+                crop_y2 = min(rotated_image.shape[0], int(np.max(expanded_points[:, 1])))
 
                 print(f"Unclip applied: {bbox} -> polygon expansion -> [{crop_x1}, {crop_y1}, {crop_x2}, {crop_y2}] (ratio: {unclip_ratio})")
             else:
                 crop_x1, crop_y1, crop_x2, crop_y2 = x1, y1, x2, y2
 
-            cropped = image[crop_y1:crop_y2, crop_x1:crop_x2]
+            cropped = rotated_image[crop_y1:crop_y2, crop_x1:crop_x2]
 
             # # 保存裁剪的图像片段用于调试
             # region_counter += 1
@@ -232,7 +375,7 @@ class PPStructureV3Pipeline:
 
             if region_type in ['text', 'paragraph_title', 'figure_title', 'table_title', 'doc_title', 'chart_title', 'list']:
                 # OCR处理
-                ocr_result = self._process_ocr_region(cropped, ocr_conf_threshold)
+                ocr_result = self._process_ocr_region(cropped, ocr_conf_threshold, **kwargs)
                 if ocr_result:
                     text_region = {
                         'bbox': bbox,
@@ -286,7 +429,7 @@ class PPStructureV3Pipeline:
 
         return results
 
-    def _process_ocr_region(self, image: np.ndarray, conf_threshold: float = 0.5) -> Optional[Dict[str, Any]]:
+    def _process_ocr_region(self, image: np.ndarray, conf_threshold: float = 0.5, **kwargs) -> Optional[Dict[str, Any]]:
         """
         处理OCR区域
 
@@ -305,7 +448,9 @@ class PPStructureV3Pipeline:
                 conf_threshold=conf_threshold,
                 use_cls=False,      # 文档分析默认不开启方向检测
                 cls_thresh=0.9,     # 方向检测阈值（不开启时不生效）
-                use_close=True      # 默认开启形态学膨胀
+                use_close=True,     # 默认开启形态学膨胀
+                merge_overlaps=kwargs.get('merge_overlaps', False),
+                overlap_threshold=kwargs.get('overlap_threshold', 0.9)
             )
 
             if not ocr_results:
@@ -390,7 +535,20 @@ class PPStructureV3Pipeline:
         Returns:
             Dict[str, Any]: 包含 'markdown' 和 'images' 键的字典
         """
+        # 根据旋转信息处理图像
+        rotation = analysis_result.get('rotation', 0)
+        if rotation == 90:
+            working_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        elif rotation == 180:
+            working_image = cv2.rotate(image, cv2.ROTATE_180)
+        elif rotation == 270:
+            working_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        else:
+            working_image = image.copy()
+        
         print(f"result_to_markdown called with image shape: {image.shape}")
+        if rotation != 0:
+            print(f"Using rotated image with shape: {working_image.shape} (rotation: {rotation}°)")
         print(f"analysis_result keys: {list(analysis_result.keys())}")
 
         markdown_parts = []
@@ -507,9 +665,9 @@ class PPStructureV3Pipeline:
                     if len(bbox) >= 4:
                         x1, y1, x2, y2 = map(int, bbox[:4])
                         x1, y1 = max(0, x1), max(0, y1)
-                        x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
+                        x2, y2 = min(working_image.shape[1], x2), min(working_image.shape[0], y2)
                         if x2 > x1 and y2 > y1:
-                            crop = image[y1:y2, x1:x2]
+                            crop = working_image[y1:y2, x1:x2]
                             s, enc = cv2.imencode('.png', cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
                             if s:
                                 # 生成唯一的图片文件名

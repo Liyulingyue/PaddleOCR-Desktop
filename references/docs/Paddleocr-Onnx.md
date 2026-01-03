@@ -29,7 +29,7 @@ PaddleOCR 支持将 PaddlePaddle 的静态图推理模型转换为 ONNX 格式�
 示例（Det / Rec / Cls）：
 
 ```
-paddle2onnx --model_dir ./inference/PP-OCRv4_mobile_det_infer \
+paddle2onnx --model_dir ./inference/PP-OCRv5_mobile_det_infer \
   --model_filename inference.pdmodel \
   --params_filename inference.pdiparams \
   --save_file ./inference/det_onnx/model.onnx \

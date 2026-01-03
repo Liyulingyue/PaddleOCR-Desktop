@@ -31,7 +31,6 @@ function App() {
         <Route path="/ocrv5" element={<OCRV5Page />} />
         <Route path="/ppstructurev3" element={<PPStructureV3Page />} />
         <Route path="/model-management" element={<ModelManagementPage />} />
-        <Route path="/ocrv4" element={<div>OCR V4 页面即将上线</div>} />
       </Routes>
     </Router>
   )

@@ -50,7 +50,7 @@ function HeaderBar({
               🏠 首页
             </Link>
             <Link to="/ocrv5" className="sidebar-link" onClick={closeSidebar}>
-              🤖 OCR识别 (V5)
+              🤖 PP-OCR V5 文字识别
             </Link>
             <Link to="/ppstructurev3" className="sidebar-link" onClick={closeSidebar}>
               📄 PP-Structure V3 布局检测
@@ -58,9 +58,6 @@ function HeaderBar({
             <Link to="/model-management" className="sidebar-link" onClick={closeSidebar}>
               📦 模型管理
             </Link>
-            {/* <Link to="/ocrv4" className="sidebar-link" onClick={closeSidebar}>
-              📷 OCR识别 (V4)
-            </Link> */}
           </nav>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -70,6 +70,7 @@ function extractTextFromResult(result: any, resultType: string = 'ocr'): string 
   return textLines.join('\n')
 }
 
+// @ts-ignore
 function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'ocr', viewOptions, markdownContent, markdownImageData, markdownImages }: ResultPanelProps) {
   const defaultViewOptions = ['json', 'drawn-image']
   if (resultType !== 'layout') {
@@ -78,7 +79,6 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
   const availableViews = viewOptions || defaultViewOptions
   
   const [view, setView] = useState<string>(availableViews[0])
-  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // 处理markdown内容，将图片引用替换为实际的data URI
   const processMarkdownContent = (content: string | null): string => {
@@ -87,13 +87,16 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
     let processedContent = content
     
     console.log('Processing markdown content, markdownImages:', markdownImages)
+    console.log('Original content sample:', content.substring(0, 500))
     
     // 将相对路径的图片引用替换为base64 data URI
     if (markdownImages) {
       Object.entries(markdownImages).forEach(([filename, base64Data]) => {
         const regex = new RegExp(`\\(images/${filename}\\)`, 'g')
+        const beforeCount = (processedContent.match(regex) || []).length
         processedContent = processedContent.replace(regex, `(${base64Data})`)
-        console.log(`Replaced images/${filename} with base64 data`)
+        const afterCount = (processedContent.match(new RegExp(`\\(data:image/png;base64,`, 'g')) || []).length
+        console.log(`Replaced images/${filename}: ${beforeCount} -> ${afterCount} replacements`)
       })
     }
     
@@ -105,112 +108,11 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
       )
     }
     
+    console.log('Processed content sample:', processedContent.substring(0, 500))
     return processedContent
   }
 
-  useEffect(() => {
-    if (view === 'ocr-text' && imageFile && result && canvasRef.current) {
-      const canvas = canvasRef.current
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
 
-      const img = new Image()
-      img.onload = () => {
-        // 设置canvas尺寸
-        canvas.width = img.width
-        canvas.height = img.height
-
-        // 填充白色背景作为空白画布
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-        // 绘制OCR结果文字（如果有坐标信息）- 支持pipeline格式
-        let ocrItems: any[] = []
-        
-        // 检查是否为多页PDF结果
-        if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && 'page' in result[0]) {
-          // 多页PDF，取第一页的结果
-          ocrItems = result[0].results || []
-        } else if (Array.isArray(result)) {
-          // 单页结果
-          ocrItems = result
-        }
-
-        if (ocrItems.length > 0) {
-          ctx.strokeStyle = '#ff0000'
-          ctx.lineWidth = 2
-          ctx.fillStyle = '#000000'
-
-          ocrItems.forEach((item: any) => {
-            if (item && typeof item === 'object' && 'box' in item && 'text' in item) {
-              const box = item.box
-              const text = item.text
-              
-              if (Array.isArray(box) && box.length >= 4) {
-                // 绘制边界框
-                ctx.beginPath()
-                if (box.length === 4) {
-                  // 四边形框 [x1,y1,x2,y2,x3,y3,x4,y4]
-                  ctx.moveTo(box[0], box[1])
-                  ctx.lineTo(box[2], box[3])
-                  ctx.lineTo(box[4], box[5])
-                  ctx.lineTo(box[6], box[7])
-                } else if (box.length === 8) {
-                  // 展平的四边形
-                  for (let i = 0; i < box.length; i += 2) {
-                    if (i === 0) {
-                      ctx.moveTo(box[i], box[i + 1])
-                    } else {
-                      ctx.lineTo(box[i], box[i + 1])
-                    }
-                  }
-                }
-                ctx.closePath()
-                ctx.stroke()
-
-                // 在框内绘制文本
-                if (text && text.trim()) {
-                  // 计算框的边界来绘制文字
-                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-                  
-                  if (box.length === 4) {
-                    // 四边形框
-                    for (let i = 0; i < box.length; i += 2) {
-                      minX = Math.min(minX, box[i])
-                      minY = Math.min(minY, box[i + 1])
-                      maxX = Math.max(maxX, box[i])
-                      maxY = Math.max(maxY, box[i + 1])
-                    }
-                  } else if (box.length === 8) {
-                    // 展平的四边形
-                    for (let i = 0; i < box.length; i += 2) {
-                      minX = Math.min(minX, box[i])
-                      minY = Math.min(minY, box[i + 1])
-                      maxX = Math.max(maxX, box[i])
-                      maxY = Math.max(maxY, box[i + 1])
-                    }
-                  }
-                  
-                  const centerX = (minX + maxX) / 2
-                  const centerY = (minY + maxY) / 2
-
-                  // 调整字体大小基于框的高度
-                  const boxHeight = maxY - minY
-                  const fontSize = Math.max(12, Math.min(24, boxHeight * 0.8))
-                  ctx.font = `${fontSize}px Arial`
-                  ctx.textAlign = 'center'
-                  ctx.textBaseline = 'middle'
-                  
-                  ctx.fillText(text, centerX, centerY)
-                }
-              }
-            }
-          })
-        }
-      }
-      img.src = URL.createObjectURL(imageFile)
-    }
-  }, [view, imageFile, result])
 
   const copyResult = async () => {
     try {
@@ -418,22 +320,22 @@ function ResultPanel({ result, imageFile, drawnImage, onMessage, resultType = 'o
             <div className="drawn-image">
               {drawnImage ? (
                 Array.isArray(drawnImage) ? (
-                  // 多张图片（PDF文件）
+                  // 多张图片（多页PDF文件）
                   <div className="pdf-images">
-                    {drawnImage.map((pageData: any, index: number) => (
+                    {drawnImage.map((imageUrl: string, index: number) => (
                       <div key={index} className="pdf-page">
-                        <div className="page-header">第 {pageData.page} 页</div>
+                        <div className="page-header">第 {index + 1} 页</div>
                         <img 
-                          src={pageData.image} 
-                          alt={`OCR结果绘制 - 第${pageData.page}页`} 
-                          style={{ maxWidth: '100%', height: 'auto' }} 
+                          src={imageUrl} 
+                          alt={`结构分析结果 - 第${index + 1}页`} 
+                          style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ddd' }} 
                         />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  // 单张图片（普通图像文件）
-                  <img src={drawnImage} alt="OCR结果绘制" style={{ maxWidth: '100%', height: 'auto' }} />
+                  // 单张图片（普通图像文件或单页PDF）
+                  <img src={drawnImage} alt="结构分析结果" style={{ maxWidth: '100%', height: 'auto' }} />
                 )
               ) : (
                 <p>绘制图像加载中...</p>

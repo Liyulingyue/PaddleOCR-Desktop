@@ -13,7 +13,7 @@ function HomePage() {
             <p>基于PaddleOCR的强大桌面OCR应用</p>
             <div className="feature-buttons">
               <button className="primary-btn" onClick={() => navigate('/ocrv5')}>
-                开始OCR识别 (V5)
+                PP-OCR V5 文字识别
               </button>
               <button className="primary-btn" onClick={() => navigate('/ppstructurev3')}>
                 PP-Structure V3 布局检测
@@ -21,9 +21,6 @@ function HomePage() {
               <button className="primary-btn" onClick={() => navigate('/model-management')}>
                 📦 模型管理
               </button>
-              {/* <button className="secondary-btn" onClick={() => navigate('/ocrv4')}>
-                OCR识别 (V4)
-              </button> */}
             </div>
           </div>
           <div className="hero-visual" aria-hidden="true" style={{width: '320px', height: '280px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)'}}></div>
@@ -35,7 +32,7 @@ function HomePage() {
         <div className="features-grid">
           <div className="feature-card">
             <h3>多模型支持</h3>
-            <p>支持PaddleOCR V4/V5和PP-Structure V3，提供高精度识别和布局检测</p>
+            <p>支持PaddleOCR V5和PP-Structure V3，提供高精度识别和布局检测</p>
           </div>
           <div className="feature-card">
             <h3>布局检测</h3>

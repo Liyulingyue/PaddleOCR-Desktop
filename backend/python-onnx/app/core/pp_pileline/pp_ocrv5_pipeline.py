@@ -49,7 +49,44 @@ class PPOCRv5Pipeline:
         
         print("PP-OCRv5 Pipeline initialized (models not loaded yet). Call load() to load models.")
 
-    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True, cls_thresh: float = 0.9, use_cls: bool = True) -> List[Dict]:
+    @staticmethod
+    def calculate_overlap_ratio(box1: List[float], box2: List[float]) -> float:
+        """Calculate overlap ratio as intersection / min(area1, area2)."""
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        # Calculate intersection
+        x1_inter = max(x1_1, x1_2)
+        y1_inter = max(y1_1, y1_2)
+        x2_inter = min(x2_1, x2_2)
+        y2_inter = min(y2_1, y2_2)
+        
+        # Check if there's no intersection
+        if x2_inter <= x1_inter or y2_inter <= y1_inter:
+            return 0.0
+        
+        # Calculate areas
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        inter_area = (x2_inter - x1_inter) * (y2_inter - y1_inter)
+        
+        # Calculate overlap ratio: intersection / min(area1, area2)
+        min_area = min(area1, area2)
+        if min_area == 0:
+            return 0.0
+            
+        return inter_area / min_area
+
+    @staticmethod
+    def merge_boxes(box1: List[float], box2: List[float]) -> List[float]:
+        """Merge two bounding boxes by taking the union."""
+        x1 = min(box1[0], box2[0])
+        y1 = min(box1[1], box2[1])
+        x2 = max(box1[2], box2[2])
+        y2 = max(box1[3], box2[3])
+        return [x1, y1, x2, y2]
+
+    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True, cls_thresh: float = 0.9, use_cls: bool = True, merge_overlaps: bool = False, overlap_threshold: float = 0.9) -> List[Dict]:
         """
         Run complete OCR pipeline on input image
         
@@ -59,6 +96,8 @@ class PPOCRv5Pipeline:
             use_close: Whether to use morphological closing in detection
             cls_thresh: Confidence threshold for classification
             use_cls: Whether to use document orientation classification
+            merge_overlaps: Whether to merge overlapping text boxes based on overlap ratio
+            overlap_threshold: Overlap threshold for merging (intersection / min(area1, area2))
             
         Returns:
             List of OCR results with text, bbox, confidence
@@ -128,7 +167,66 @@ class PPOCRv5Pipeline:
             }
             results.append(result)
         
+        # Optional: Merge overlapping text boxes
+        if merge_overlaps:
+            results = self.merge_overlapping_boxes(results, overlap_threshold)
+        
         return results
+
+    def merge_overlapping_boxes(self, results: List[Dict], overlap_threshold: float = 0.9) -> List[Dict]:
+        """
+        Merge overlapping text detection boxes based on overlap ratio.
+        
+        Args:
+            results: List of OCR results with bbox information
+            overlap_threshold: Overlap threshold for merging (intersection / min(area1, area2))
+            
+        Returns:
+            List of merged OCR results
+        """
+        if not results:
+            return results
+        
+        # Sort results by confidence (highest first)
+        sorted_results = sorted(results, key=lambda x: x.get('confidence', 0), reverse=True)
+        merged_results = []
+        
+        for result in sorted_results:
+            current_box = result['bbox']
+            should_merge = False
+            
+            # Check against already merged results
+            for i, merged_result in enumerate(merged_results):
+                merged_box = merged_result['bbox']
+                overlap_ratio = self.calculate_overlap_ratio(current_box, merged_box)
+                
+                if overlap_ratio >= overlap_threshold:
+                    # Merge the boxes
+                    new_box = self.merge_boxes(current_box, merged_box)
+                    
+                    # Update merged result
+                    # Combine texts (take the one with higher confidence)
+                    if result.get('confidence', 0) > merged_result.get('confidence', 0):
+                        merged_result['text'] = result['text']
+                        merged_result['confidence'] = result['confidence']
+                    
+                    # Update bbox
+                    merged_result['bbox'] = new_box
+                    
+                    # Update other confidence scores (take maximum)
+                    merged_result['text_region_confidence'] = max(
+                        result.get('text_region_confidence', 0),
+                        merged_result.get('text_region_confidence', 0)
+                    )
+                    
+                    should_merge = True
+                    break
+            
+            # If not merged with any existing result, add as new
+            if not should_merge:
+                merged_results.append(result.copy())
+        
+        return merged_results
 
     def load(self) -> bool:
         """

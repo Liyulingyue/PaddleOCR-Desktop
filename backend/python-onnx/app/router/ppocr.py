@@ -83,7 +83,9 @@ async def recognize(
     file: UploadFile = File(...),
     det_db_thresh: float = Form(0.3),
     cls_thresh: float = Form(0.9),
-    use_cls: bool = Form(True)
+    use_cls: bool = Form(True),
+    merge_overlaps: bool = Form(False),
+    overlap_threshold: float = Form(0.9)
 ):
     """
     使用PP-OCRv5 Pipeline进行OCR识别（返回pipeline格式）
@@ -93,6 +95,8 @@ async def recognize(
         det_db_thresh: 检测阈值（保留参数以保持兼容性）
         cls_thresh: 分类阈值（保留参数以保持兼容性）
         use_cls: 是否使用分类（保留参数以保持兼容性）
+        merge_overlaps: 是否合并重叠的文本框
+        overlap_threshold: 合并重叠框的重叠度阈值（交集/最小面积）
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用，请检查依赖"})
@@ -138,7 +142,7 @@ async def recognize(
             for page_idx, img in enumerate(images):
                 try:
                     # 使用pipeline进行OCR
-                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls)
+                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
                     # 直接返回pipeline格式
                     formatted_results = []
@@ -171,7 +175,7 @@ async def recognize(
             img = np.array(img)
 
             # 使用pipeline进行OCR
-            results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls)
+            results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
             # 直接返回pipeline格式
             formatted_results = []
@@ -197,7 +201,8 @@ async def recognize(
 async def draw_ocr_result(
     file: UploadFile = File(...),
     ocr_result: str = Form(...),
-    drop_score: float = Form(0.0)
+    drop_score: float = Form(0.0),
+    max_pages: int = Form(2)
 ):
     """
     绘制OCR结果（仅支持pipeline格式）
@@ -206,6 +211,7 @@ async def draw_ocr_result(
         file: 上传的图像文件或PDF文件
         ocr_result: OCR结果的JSON字符串（pipeline格式）
         drop_score: 丢弃分数阈值（0.0表示不过滤，默认0.0）
+        max_pages: 对于多页PDF，限制最多处理和返回的页面数（默认2页）
     """
     contents = await file.read()
     filename = file.filename.lower() if file.filename else ""
@@ -223,8 +229,14 @@ async def draw_ocr_result(
             if not images:
                 return JSONResponse(status_code=400, content={"error": "PDF文件没有有效页面"})
 
+            # 限制处理的最大页面数
+            total_pages = len(images)
+            limited_images = images[:max_pages]
+
+            print(f"PDF共有{total_pages}页，限制处理{max_pages}页，实际处理{len(limited_images)}页")
+
             drawn_pages = []
-            for page_idx, img in enumerate(images):
+            for page_idx, img in enumerate(limited_images):
                 # 仅支持pipeline格式
                 if "results" in ocr_data and isinstance(ocr_data["results"], list):
                     results = ocr_data["results"]
@@ -264,8 +276,8 @@ async def draw_ocr_result(
                         # 根据页面的rotation角度旋转图像
                         rotated_img = rotate_image(img, page_rotation)
                         
-                        # 在旋转后的图像上绘制OCR结果
-                        drawn_img = draw_ocr(rotated_img, boxes, txts, scores, drop_score=drop_score)
+                        # 在旋转后的图像上绘制OCR结果（只绘制边界框，不显示文字）
+                        drawn_img = draw_ocr(rotated_img, boxes, txts=None, scores=None, drop_score=drop_score)
                         drawn_pages.append(drawn_img)
                     else:
                         drawn_pages.append(img)
@@ -286,11 +298,19 @@ async def draw_ocr_result(
                 import base64
                 img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
                 page_images.append({
-                    "page": page_idx + 1,
-                    "image": f"data:image/png;base64,{img_base64}"
+                    "page_number": page_idx + 1,
+                    "data": img_base64
                 })
 
-            return {"result": page_images}
+            # 返回JSON格式的多页图片列表
+            print(f"返回{len(page_images)}页的OCR绘制结果（总共{total_pages}页）")
+            return {
+                'file_type': 'pdf',
+                'total_pages': total_pages,
+                'processed_pages': len(page_images),
+                'max_pages_limit': max_pages,
+                'images': page_images
+            }
         else:
             # 处理图像文件
             img = Image.open(io.BytesIO(contents)).convert("RGB")
@@ -321,8 +341,8 @@ async def draw_ocr_result(
                     # 根据全局rotation角度旋转图像
                     rotated_img = rotate_image(img_np, global_rotation)
                     
-                    # 在旋转后的图像上绘制OCR结果
-                    drawn_img = draw_ocr(rotated_img, boxes, txts, scores, drop_score=drop_score)
+                    # 在旋转后的图像上绘制OCR结果（只绘制边界框，不显示文字）
+                    drawn_img = draw_ocr(rotated_img, boxes, txts=None, scores=None, drop_score=drop_score)
                     # Convert to PIL Image
                     pil_img = Image.fromarray(drawn_img)
                     # Save to BytesIO

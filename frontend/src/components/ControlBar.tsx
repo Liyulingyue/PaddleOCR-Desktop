@@ -18,6 +18,7 @@ interface SidebarProps {
 
 function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
+  const [ppstructureOcrConfigExpanded, setPpstructureOcrConfigExpanded] = useState(false)
 
   // Model status panel
   const [modelExpanded, setModelExpanded] = useState(false)
@@ -192,41 +193,69 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                   </div>
                   <small className="config-description">控制布局检测的置信度阈值</small>
                 </div>
+
                 <div className="config-item">
-                  <label htmlFor="ocr-det-thresh">OCR检测阈值: {config.ocrDetThresh}</label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.useCls}
+                      onChange={(e) => onConfigChange({ ...config, useCls: e.target.checked })}
+                      disabled={loading}
+                    />
+                    启用方向检测
+                  </label>
+                  <small className="config-description">自动检测和纠正文档方向（0°、90°、180°、270°）</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="cls-threshold">方向检测阈值: {config.clsThresh}</label>
                   <input
-                    id="ocr-det-thresh"
+                    id="cls-threshold"
                     type="range"
                     min="0"
                     max="1"
                     step="0.05"
-                    value={config.ocrDetThresh}
-                    onChange={(e) => onConfigChange({ ...config, ocrDetThresh: parseFloat(e.target.value) })}
-                    disabled={loading}
+                    value={config.clsThresh}
+                    onChange={(e) => onConfigChange({ ...config, clsThresh: parseFloat(e.target.value) })}
+                    disabled={loading || !config.useCls}
                   />
                   <div className="range-labels">
                     <span>0.0</span>
                     <span>1.0</span>
                   </div>
-                  <small className="config-description">控制OCR文本检测的灵敏度，较低值检测更多文本</small>
+                  <small className="config-description">控制方向检测的置信度阈值，低于此值将跳过旋转</small>
                 </div>
+
                 <div className="config-item">
-                  <label htmlFor="unclip-ratio">裁剪扩大倍数: {config.unclipRatio}</label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.mergeLayout}
+                      onChange={(e) => onConfigChange({ ...config, mergeLayout: e.target.checked })}
+                      disabled={loading}
+                    />
+                    合并重叠布局框
+                  </label>
+                  <small className="config-description">启用基于重叠度的布局框合并（仅同类型框会合并）</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="layout-overlap-threshold">布局重叠度阈值: {config.layoutOverlapThreshold}</label>
                   <input
-                    id="unclip-ratio"
+                    id="layout-overlap-threshold"
                     type="range"
-                    min="1.0"
-                    max="2.0"
-                    step="0.1"
-                    value={config.unclipRatio}
-                    onChange={(e) => onConfigChange({ ...config, unclipRatio: parseFloat(e.target.value) })}
-                    disabled={loading}
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.layoutOverlapThreshold}
+                    onChange={(e) => onConfigChange({ ...config, layoutOverlapThreshold: parseFloat(e.target.value) })}
+                    disabled={loading || !config.mergeLayout}
                   />
                   <div className="range-labels">
+                    <span>0.0</span>
                     <span>1.0</span>
-                    <span>2.0</span>
                   </div>
-                  <small className="config-description">扩大裁剪区域以包含完整文本，类似PaddleOCR的unclip算法，默认1.1倍</small>
+                  <small className="config-description">控制布局框合并的重叠度阈值（交集/最小面积），较高值只合并高度重叠的框</small>
                 </div>
               </>
             ) : (
@@ -248,6 +277,19 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                     <span>1.0</span>
                   </div>
                   <small className="config-description">控制文本检测的灵敏度，较低值检测更多文本</small>
+                </div>
+
+                <div className="config-item">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.useCls}
+                      onChange={(e) => onConfigChange({ ...config, useCls: e.target.checked })}
+                      disabled={loading}
+                    />
+                    启用文本方向分类
+                  </label>
+                  <small className="config-description">是否执行文本方向检测和矫正</small>
                 </div>
 
                 <div className="config-item">
@@ -273,13 +315,32 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={config.useCls}
-                      onChange={(e) => onConfigChange({ ...config, useCls: e.target.checked })}
+                      checked={config.mergeOverlaps}
+                      onChange={(e) => onConfigChange({ ...config, mergeOverlaps: e.target.checked })}
                       disabled={loading}
                     />
-                    启用文本方向分类
+                    合并重叠检测框
                   </label>
-                  <small className="config-description">是否执行文本方向检测和矫正</small>
+                  <small className="config-description">启用基于重叠度阈值的重叠文本框合并功能</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="overlap-threshold-ocr">重叠度阈值: {config.overlapThreshold}</label>
+                  <input
+                    id="overlap-threshold-ocr"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.overlapThreshold}
+                    onChange={(e) => onConfigChange({ ...config, overlapThreshold: parseFloat(e.target.value) })}
+                    disabled={loading || !config.mergeOverlaps}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制重叠框合并的重叠度阈值（交集/最小面积），较高值只合并高度重叠的框</small>
                 </div>
               </>
             )}
@@ -287,7 +348,89 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         )}
       </div>
 
+      {pageType === 'ppstructure' && (
+        <div className="control-section">
+          <div 
+            className="config-section-header"
+            onClick={() => setPpstructureOcrConfigExpanded(!ppstructureOcrConfigExpanded)}
+          >
+            <h4>OCR配置参数</h4>
+            <span className={`expand-icon ${ppstructureOcrConfigExpanded ? 'expanded' : ''}`}>▼</span>
+          </div>
+          {ppstructureOcrConfigExpanded && (
+            <div className="config-content">
+              <div className="config-item">
+                <label htmlFor="ocr-det-thresh">OCR检测阈值: {config.ocrDetThresh}</label>
+                <input
+                  id="ocr-det-thresh"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={config.ocrDetThresh}
+                  onChange={(e) => onConfigChange({ ...config, ocrDetThresh: parseFloat(e.target.value) })}
+                  disabled={loading}
+                />
+                <div className="range-labels">
+                  <span>0.0</span>
+                  <span>1.0</span>
+                </div>
+                <small className="config-description">控制OCR文本检测的灵敏度，较低值检测更多文本</small>
+              </div>
+              <div className="config-item">
+                <label htmlFor="unclip-ratio">裁剪扩大倍数: {config.unclipRatio}</label>
+                <input
+                  id="unclip-ratio"
+                  type="range"
+                  min="1.0"
+                  max="2.0"
+                  step="0.1"
+                  value={config.unclipRatio}
+                  onChange={(e) => onConfigChange({ ...config, unclipRatio: parseFloat(e.target.value) })}
+                  disabled={loading}
+                />
+                <div className="range-labels">
+                  <span>1.0</span>
+                  <span>2.0</span>
+                </div>
+                <small className="config-description">扩大裁剪区域以包含完整文本，类似PaddleOCR的unclip算法，默认1.1倍</small>
+              </div>
 
+              <div className="config-item">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={config.mergeOverlaps}
+                    onChange={(e) => onConfigChange({ ...config, mergeOverlaps: e.target.checked })}
+                    disabled={loading}
+                  />
+                  合并重叠检测框
+                </label>
+                <small className="config-description">启用基于重叠度阈值的重叠文本框合并功能</small>
+              </div>
+
+              <div className="config-item">
+                <label htmlFor="overlap-threshold">重叠度阈值: {config.overlapThreshold}</label>
+                <input
+                  id="overlap-threshold"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={config.overlapThreshold}
+                  onChange={(e) => onConfigChange({ ...config, overlapThreshold: parseFloat(e.target.value) })}
+                  disabled={loading || !config.mergeOverlaps}
+                />
+                <div className="range-labels">
+                  <span>0.0</span>
+                  <span>1.0</span>
+                </div>
+                <small className="config-description">控制重叠框合并的重叠度阈值（交集/最小面积），较高值只合并高度重叠的框</small>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
     </aside>
   )
