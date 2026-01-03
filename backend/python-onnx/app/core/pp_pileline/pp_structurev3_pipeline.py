@@ -25,9 +25,9 @@ class PPStructureV3Pipeline:
 
     def __init__(
         self,
-        layout_model_path: str,
-        ocr_det_model_path: str,
-        ocr_rec_model_path: str,
+        layout_model_path: Optional[str] = None,
+        ocr_det_model_path: Optional[str] = None,
+        ocr_rec_model_path: Optional[str] = None,
         ocr_cls_model_path: Optional[str] = None,
         ocr_rec_char_dict_path: Optional[str] = None,
         use_gpu: bool = False,
@@ -39,16 +39,58 @@ class PPStructureV3Pipeline:
         初始化PP-StructureV3流水线
 
         Args:
-            layout_model_path: 布局检测模型路径
-            ocr_det_model_path: OCR检测模型路径
-            ocr_rec_model_path: OCR识别模型路径
-            ocr_cls_model_path: OCR分类模型路径（可选）
+            layout_model_path: 布局检测模型路径（可选，使用config默认值）
+            ocr_det_model_path: OCR检测模型路径（可选，使用config默认值）
+            ocr_rec_model_path: OCR识别模型路径（可选，使用config默认值）
+            ocr_cls_model_path: OCR分类模型路径（可选，使用config默认值）
             ocr_rec_char_dict_path: OCR识别模型字符字典路径
             use_gpu: 是否使用GPU
             gpu_id: GPU设备ID
             layout_config: 布局检测模型配置
             ocr_config: OCR模型配置
         """
+        # 如果没有提供模型路径，使用配置文件中的默认路径
+        config_available = True
+        if (layout_model_path is None or ocr_det_model_path is None or 
+            ocr_rec_model_path is None or ocr_cls_model_path is None):
+            try:
+                from ...config import get_pipeline_models
+                pipeline_models = get_pipeline_models("pp_structure_v3")
+                if pipeline_models:
+                    layout_model_path = layout_model_path or pipeline_models.get('layout_det')
+                    ocr_det_model_path = ocr_det_model_path or pipeline_models.get('ocr_det')
+                    ocr_rec_model_path = ocr_rec_model_path or pipeline_models.get('ocr_rec')
+                    ocr_cls_model_path = ocr_cls_model_path or pipeline_models.get('doc_cls')
+                else:
+                    config_available = False
+            except ImportError:
+                config_available = False
+                print("Warning: Could not import config, using None for model paths")
+        
+        # 验证必需的模型路径
+        missing_required = []
+        if not layout_model_path:
+            missing_required.append("layout_model_path")
+        if not ocr_det_model_path:
+            missing_required.append("ocr_det_model_path") 
+        if not ocr_rec_model_path:
+            missing_required.append("ocr_rec_model_path")
+            
+        if missing_required:
+            if config_available:
+                raise ValueError(f"Required model paths not found in config: {', '.join(missing_required)}")
+            else:
+                raise ValueError(f"Required model paths must be provided when config is unavailable: {', '.join(missing_required)}")
+        
+        self.layout_model_path = layout_model_path
+        self.ocr_det_model_path = ocr_det_model_path
+        self.ocr_rec_model_path = ocr_rec_model_path
+        self.ocr_cls_model_path = ocr_cls_model_path
+        self.ocr_rec_char_dict_path = ocr_rec_char_dict_path
+        self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
+        self.layout_config = layout_config
+        self.ocr_config = ocr_config
         # 保存配置
         self.layout_model_path = layout_model_path
         self.use_gpu = use_gpu
@@ -87,6 +129,28 @@ class PPStructureV3Pipeline:
         try:
             if self._loaded:
                 return True
+
+            # 检查模型路径是否存在
+            from pathlib import Path
+            
+            missing_models = []
+            if self.layout_model_path and not Path(self.layout_model_path).exists():
+                missing_models.append(f"Layout model: {self.layout_model_path}")
+            
+            # 检查OCR流水线的模型路径
+            if hasattr(self.ocr_pipeline, 'det_model_path') and self.ocr_pipeline.det_model_path and not Path(self.ocr_pipeline.det_model_path).exists():
+                missing_models.append(f"OCR Detection model: {self.ocr_pipeline.det_model_path}")
+            if hasattr(self.ocr_pipeline, 'rec_model_path') and self.ocr_pipeline.rec_model_path and not Path(self.ocr_pipeline.rec_model_path).exists():
+                missing_models.append(f"OCR Recognition model: {self.ocr_pipeline.rec_model_path}")
+            if hasattr(self.ocr_pipeline, 'cls_model_path') and self.ocr_pipeline.cls_model_path and not Path(self.ocr_pipeline.cls_model_path).exists():
+                missing_models.append(f"OCR Classification model: {self.ocr_pipeline.cls_model_path}")
+            
+            if missing_models:
+                print("Error: The following model files are missing:")
+                for missing in missing_models:
+                    print(f"  - {missing}")
+                print("Please ensure all model files exist or run model download commands.")
+                return False
 
             # 初始化布局检测模型
             self.layout_model = PPDocLayoutONNX(

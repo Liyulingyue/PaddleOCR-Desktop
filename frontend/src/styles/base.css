@@ -400,3 +400,38 @@ button:disabled {
   overflow-x: auto;
   white-space: pre-wrap;
 }
+
+.code-examples {
+  margin-top: 16px;
+}
+
+.code-examples h5 {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.code-block {
+  margin-bottom: 16px;
+}
+
+.code-block h6 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.code-block pre {
+  background: #1e1e1e;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  color: #d4d4d4;
+}

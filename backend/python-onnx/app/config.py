@@ -87,47 +87,23 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# # =============================================================================
-# # Pipeline配置：pipeline和使用模型的对应关系
-# # =============================================================================
-# PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
-#     "pp_structure_v3": {
-#         "models": {
-#             "layout": "PP-DocLayout-L-ONNX",
-#             "ocr_det": "PP-OCRv5-Det",
-#             "ocr_rec": "PP-OCRv5-Rec",
-#             "ocr_cls": "PP-OCRv5-Cls",
-#             "ocr_dict": "PP-OCRv5-Dict"
-#         },
-#         "description": "PP-StructureV3 完整文档结构分析流水线"
-#     },
-#     "ppocrv5": {
-#         "models": {
-#             "det": "PP-OCRv5-Det",
-#             "rec": "PP-OCRv5-Rec",
-#             "cls": "PP-OCRv5-Cls",
-#             "dict": "PP-OCRv5-Dict"
-#         },
-#         "description": "PP-OCRv5 OCR识别流水线"
-#     }
-# }
-
-# # 向后兼容的旧配置（已废弃，建议使用新的结构）
-# models_config = {
-#     "pp_structure_v3": {
-#         "layout": MODEL_REGISTRY["PP-DocLayout-L-ONNX"],
-#         "ocr_det": MODEL_REGISTRY["PP-OCRv5-Det"],
-#         "ocr_rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
-#         "ocr_cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
-#         "ocr_dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
-#     },
-#     "ppocrv5": {
-#         "det": MODEL_REGISTRY["PP-OCRv5-Det"],
-#         "rec": MODEL_REGISTRY["PP-OCRv5-Rec"],
-#         "cls": MODEL_REGISTRY["PP-OCRv5-Cls"],
-#         "dict": MODEL_REGISTRY["PP-OCRv5-Dict"]
-#     }
-# }
+PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
+    "pp_structure_v3": {
+        "models": {
+            "layout_det": "PP-DocLayout-L-ONNX",
+            "ocr_det": "PP-OCRv5_mobile_det-ONNX",
+            "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
+            "doc_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
+        },
+    },
+    "ppocrv5": {
+        "models": {
+            "ocr_det": "PP-OCRv5_mobile_det-ONNX",
+            "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
+            "doc_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
+        },
+    }
+}
 
 def get_model_path(model_type: str, component: str) -> Optional[str]:
     """
@@ -135,36 +111,35 @@ def get_model_path(model_type: str, component: str) -> Optional[str]:
 
     Args:
         model_type: 模型类型，如 'pp_structure_v3'
-        component: 组件名称，如 'layout', 'ocr_det'
+        component: 组件名称，如 'layout_det', 'ocr_det'
 
     Returns:
         模型文件路径，如果失败返回None
     """
-    if model_type not in models_config or component not in models_config[model_type]:
+    if model_type not in PIPELINE_CONFIG or component not in PIPELINE_CONFIG[model_type]["models"]:
         return None
 
-    config = models_config[model_type][component]
-    models_dir = Path(get_models_dir())
-    local_path = models_dir / config["local_path"]
+    model_name = PIPELINE_CONFIG[model_type]["models"][component]
+    return get_model_path_from_registry(model_name)
 
-    if local_path.exists():
-        return str(local_path)
+def get_available_pipelines() -> list[str]:
+    """
+    获取所有可用的pipeline名称
 
-    # 如果不存在，尝试下载
-    if download_model(config, models_dir):
-        return str(local_path)
-
-    return None
+    Returns:
+        pipeline名称列表
+    """
+    return list(PIPELINE_CONFIG.keys())
 
 def get_pipeline_models(pipeline_name: str) -> Dict[str, str]:
     """
-    获取pipeline使用的模型列表
+    获取pipeline使用的模型路径映射
 
     Args:
         pipeline_name: pipeline名称，如 'pp_structure_v3'
 
     Returns:
-        模型名称到路径的映射字典
+        组件名称到模型文件路径的映射字典，只包含可用的模型
     """
     if pipeline_name not in PIPELINE_CONFIG:
         return {}
@@ -178,6 +153,116 @@ def get_pipeline_models(pipeline_name: str) -> Dict[str, str]:
             models[component] = path
 
     return models
+
+def get_pipeline_model_info(pipeline_name: str) -> Optional[Dict[str, Any]]:
+    """
+    获取pipeline的详细信息，包括所有模型信息
+
+    Args:
+        pipeline_name: pipeline名称
+
+    Returns:
+        包含模型信息和路径的字典，如果pipeline不存在返回None
+    """
+    if pipeline_name not in PIPELINE_CONFIG:
+        return None
+
+    pipeline_config = PIPELINE_CONFIG[pipeline_name]
+    model_info = {
+        "pipeline": pipeline_name,
+        "models": {},
+        "all_models_available": True
+    }
+
+    for component, model_name in pipeline_config["models"].items():
+        model_path = get_model_path_from_registry(model_name)
+        model_info["models"][component] = {
+            "model_name": model_name,
+            "path": model_path,
+            "available": model_path is not None
+        }
+        if model_path is None:
+            model_info["all_models_available"] = False
+
+    return model_info
+
+def validate_pipeline_config(pipeline_name: str) -> Dict[str, Any]:
+    """
+    验证pipeline配置是否正确，所有模型是否可用
+
+    Args:
+        pipeline_name: pipeline名称
+
+    Returns:
+        验证结果字典
+    """
+    result = {
+        "pipeline": pipeline_name,
+        "valid": False,
+        "missing_models": [],
+        "available_models": [],
+        "errors": []
+    }
+
+    if pipeline_name not in PIPELINE_CONFIG:
+        result["errors"].append(f"Pipeline '{pipeline_name}' not found in PIPELINE_CONFIG")
+        return result
+
+    pipeline_config = PIPELINE_CONFIG[pipeline_name]
+
+    for component, model_name in pipeline_config["models"].items():
+        if model_name not in MODEL_REGISTRY:
+            result["errors"].append(f"Model '{model_name}' for component '{component}' not found in MODEL_REGISTRY")
+            result["missing_models"].append(model_name)
+        else:
+            model_path = get_model_path_from_registry(model_name)
+            if model_path:
+                result["available_models"].append({
+                    "component": component,
+                    "model_name": model_name,
+                    "path": model_path
+                })
+            else:
+                result["missing_models"].append(model_name)
+
+    result["valid"] = len(result["errors"]) == 0 and len(result["missing_models"]) == 0
+    return result
+
+def ensure_pipeline_models_available(pipeline_name: str, download_missing: bool = True) -> bool:
+    """
+    确保pipeline的所有模型都可用，如果需要则下载
+
+    Args:
+        pipeline_name: pipeline名称
+        download_missing: 是否下载缺失的模型
+
+    Returns:
+        是否所有模型都可用
+    """
+    if pipeline_name not in PIPELINE_CONFIG:
+        print(f"Pipeline '{pipeline_name}' not found")
+        return False
+
+    pipeline_config = PIPELINE_CONFIG[pipeline_name]
+    all_available = True
+
+    for component, model_name in pipeline_config["models"].items():
+        model_path = get_model_path_from_registry(model_name)
+        if model_path is None:
+            if download_missing:
+                print(f"Model '{model_name}' for component '{component}' is missing, attempting to download...")
+                # download_model函数会自动处理下载
+                model_path = get_model_path_from_registry(model_name)
+                if model_path:
+                    print(f"Successfully downloaded model '{model_name}'")
+                else:
+                    print(f"Failed to download model '{model_name}'")
+                    all_available = False
+            else:
+                print(f"Model '{model_name}' for component '{component}' is not available")
+                all_available = False
+
+    return all_available
 
 def get_model_path_from_registry(model_name: str) -> Optional[str]:
     """
@@ -280,3 +365,97 @@ def download_model(config: Dict[str, Any], models_dir: Path) -> bool:
     except Exception as e:
         print(f"Failed to download model: {e}")
         return False
+
+def get_available_models() -> Dict[str, Dict[str, Any]]:
+    """
+    获取所有可用模型的信息
+
+    Returns:
+        模型名称到模型信息的映射字典
+    """
+    models_info = {}
+    for model_name, config in MODEL_REGISTRY.items():
+        model_path = get_model_path_from_registry(model_name)
+        models_info[model_name] = {
+            "config": config,
+            "path": model_path,
+            "available": model_path is not None
+        }
+    return models_info
+
+def get_model_info(model_name: str) -> Optional[Dict[str, Any]]:
+    """
+    获取单个模型的详细信息
+
+    Args:
+        model_name: 模型名称
+
+    Returns:
+        模型信息字典，包含配置、路径和可用性
+    """
+    if model_name not in MODEL_REGISTRY:
+        return None
+
+    config = MODEL_REGISTRY[model_name]
+    model_path = get_model_path_from_registry(model_name)
+
+    return {
+        "model_name": model_name,
+        "config": config,
+        "path": model_path,
+        "available": model_path is not None,
+        "local_path": config["local_path"]
+    }
+
+def list_pipeline_status() -> Dict[str, Dict[str, Any]]:
+    """
+    列出所有pipeline的状态
+
+    Returns:
+        pipeline名称到状态信息的映射字典
+    """
+    status = {}
+    for pipeline_name in get_available_pipelines():
+        status[pipeline_name] = validate_pipeline_config(pipeline_name)
+    return status
+
+def print_pipeline_info(pipeline_name: str) -> None:
+    """
+    打印pipeline的详细信息
+
+    Args:
+        pipeline_name: pipeline名称
+    """
+    info = get_pipeline_model_info(pipeline_name)
+    if not info:
+        print(f"Pipeline '{pipeline_name}' not found")
+        return
+
+    print(f"\n=== Pipeline: {pipeline_name} ===")
+    print(f"All models available: {info['all_models_available']}")
+
+    print("\nModels:")
+    for component, model_info in info["models"].items():
+        status = "✓" if model_info["available"] else "✗"
+        path = model_info["path"] or "Not available"
+        print(f"  {component}: {model_info['model_name']} {status}")
+        print(f"    Path: {path}")
+
+def print_all_models_status() -> None:
+    """
+    打印所有模型的状态
+    """
+    print("\n=== All Models Status ===")
+    models_info = get_available_models()
+
+    available_count = 0
+    total_count = len(models_info)
+
+    for model_name, info in models_info.items():
+        if info["available"]:
+            available_count += 1
+            print(f"✓ {model_name}: {info['path']}")
+        else:
+            print(f"✗ {model_name}: Not available")
+
+    print(f"\nTotal: {available_count}/{total_count} models available")

@@ -105,26 +105,10 @@ async def recognize(
     filename = file.filename.lower() if file.filename else ""
 
     try:
-        # 获取模型路径
-        from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models"
-        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
-
-        # 检查模型文件是否存在
-        if not all([det_model.exists(), rec_model.exists(), cls_model.exists()]):
-            return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
-
         # 获取或创建pipeline实例
         pipeline = get_global_pipeline()
         if pipeline is None:
-            pipeline = PPOCRv5Pipeline(
-                det_model_path=str(det_model),
-                rec_model_path=str(rec_model),
-                cls_model_path=str(cls_model),
-                use_gpu=False
-            )
+            pipeline = PPOCRv5Pipeline(use_gpu=False)
             set_global_pipeline(pipeline)
 
         # 检查是否为PDF文件

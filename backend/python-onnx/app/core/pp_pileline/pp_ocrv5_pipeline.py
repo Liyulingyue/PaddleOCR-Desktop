@@ -29,12 +29,24 @@ class PPOCRv5Pipeline:
         Initialize the complete PP-OCRv5 pipeline
         
         Args:
-            det_model_path: Path to detection model (optional, uses default)
-            rec_model_path: Path to recognition model (optional, uses default)
-            cls_model_path: Path to classification model (optional, uses default)
+            det_model_path: Path to detection model (optional, uses default from config)
+            rec_model_path: Path to recognition model (optional, uses default from config)
+            cls_model_path: Path to classification model (optional, uses default from config)
             use_gpu: Whether to use GPU
             gpu_id: GPU device ID
         """
+        # 如果没有提供模型路径，使用配置文件中的默认路径
+        if det_model_path is None or rec_model_path is None or cls_model_path is None:
+            try:
+                from ...config import get_pipeline_models
+                pipeline_models = get_pipeline_models("ppocrv5")
+                if pipeline_models:
+                    det_model_path = det_model_path or pipeline_models.get('ocr_det')
+                    rec_model_path = rec_model_path or pipeline_models.get('ocr_rec')
+                    cls_model_path = cls_model_path or pipeline_models.get('doc_cls')
+            except ImportError:
+                print("Warning: Could not import config, using None for model paths")
+        
         # Store configuration, don't load models yet
         self.det_model_path = det_model_path
         self.rec_model_path = rec_model_path
@@ -241,6 +253,24 @@ class PPOCRv5Pipeline:
                 return True
             
             print("Loading PP-OCRv5 Pipeline models...")
+            
+            # 检查模型路径是否存在
+            from pathlib import Path
+            
+            missing_models = []
+            if self.cls_model_path and not Path(self.cls_model_path).exists():
+                missing_models.append(f"Classification model: {self.cls_model_path}")
+            if self.det_model_path and not Path(self.det_model_path).exists():
+                missing_models.append(f"Detection model: {self.det_model_path}")
+            if self.rec_model_path and not Path(self.rec_model_path).exists():
+                missing_models.append(f"Recognition model: {self.rec_model_path}")
+            
+            if missing_models:
+                print("Error: The following model files are missing:")
+                for missing in missing_models:
+                    print(f"  - {missing}")
+                print("Please ensure all model files exist or run model download commands.")
+                return False
             
             # Initialize orientation classifier
             self.cls_model = PPLCNetDocONNX(model_path=self.cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
+import ApiModal from '../components/ApiModal'
 import { getCachedApiBaseUrl } from '../utils/api'
 
 function PPStructureV3Page() {
@@ -273,75 +274,12 @@ function PPStructureV3Page() {
       <Viewer file={file} />
       <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessageWithAutoClear} resultType="layout" viewOptions={['json', 'drawn-image', 'markdown']} markdownContent={markdownContent} markdownImageData={markdownImageData} markdownImages={markdownImages} />
 
-      {showApiModal && (
-        <div className="api-modal-overlay" onClick={() => setShowApiModal(false)}>
-          <div className="api-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="api-modal-header">
-              <h3>API 文档</h3>
-              <button className="close-btn" onClick={() => setShowApiModal(false)}>×</button>
-            </div>
-            <div className="api-modal-content">
-              <div className="api-section">
-                <h4>🔗 接口地址</h4>
-                <code className="api-url">{apiBaseUrl}</code>
-              </div>
-
-              <div className="api-section">
-                <h4>📝 PP-Structure V3 布局检测接口</h4>
-                <div className="api-endpoint">
-                  <code className="method">POST</code>
-                  <code className="endpoint">/api/ppstructure</code>
-                </div>
-                <div className="api-params">
-                  <h5>参数：</h5>
-                  <ul>
-                    <li><code>file</code>: 上传的图像文件或PDF文件</li>
-                    <li><code>layout_conf_threshold</code>: 布局检测阈值 (0.0-1.0，默认: 0.5)</li>
-                    <li><code>ocr_det_db_thresh</code>: OCR检测阈值 (0.0-1.0，默认: 0.3)</li>
-                    <li><code>use_cls</code>: 是否启用方向检测 (true/false，默认: true)</li>
-                    <li><code>cls_thresh</code>: 方向检测置信度阈值 (0.0-1.0，默认: 0.9)</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="api-section">
-                <h4>🎨 可视化接口</h4>
-                <div className="api-endpoint">
-                  <code className="method">POST</code>
-                  <code className="endpoint">/api/ppstructure/draw</code>
-                </div>
-                <div className="api-params">
-                  <h5>参数：</h5>
-                  <ul>
-                    <li><code>file</code>: 原始图像文件</li>
-                    <li><code>layout_result</code>: 布局检测结果的JSON字符串</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="api-section">
-                <h4>📝 Markdown生成接口</h4>
-                <div className="api-endpoint">
-                  <code className="method">POST</code>
-                  <code className="endpoint">/api/ppstructure/markdown</code>
-                </div>
-                <div className="api-params">
-                  <h5>参数：</h5>
-                  <ul>
-                    <li><code>file</code>: 原始图像文件</li>
-                    <li><code>layout_result</code>: 布局检测结果的JSON字符串</li>
-                  </ul>
-                  <h5>返回：</h5>
-                  <ul>
-                    <li><code>markdown</code>: 生成的Markdown文档字符串（包含相对路径图片引用）</li>
-                    <li><code>images</code>: 图片数组，每个图片包含 <code>filename</code> 和 <code>data</code>（二进制数据）</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ApiModal
+        isOpen={showApiModal}
+        onClose={() => setShowApiModal(false)}
+        apiBaseUrl={apiBaseUrl}
+        type="ppstructure"
+      />
     </div>
   )
 }

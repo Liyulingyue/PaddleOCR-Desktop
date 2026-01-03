@@ -43,23 +43,118 @@ python run.py
 
 ### API接口
 
-- `GET /api/health` - 健康检查
+#### OCR 接口
+
 - `POST /api/ocr/` - OCR识别
   - 参数：
     - `file`: 上传的图像或PDF文件
     - `det_db_thresh`: 检测阈值 (默认: 0.3)
     - `cls_thresh`: 分类阈值 (默认: 0.9)
     - `use_cls`: 是否使用方向分类 (默认: True)
+    - `merge_overlaps`: 是否合并重叠框 (默认: False)
+    - `overlap_threshold`: 重叠阈值 (默认: 0.9)
+
+- `POST /api/ocr/draw` - 绘制OCR结果
+  - 参数：
+    - `file`: 上传的图像或PDF文件
+    - `ocr_result`: OCR结果的JSON字符串
+    - `drop_score`: 丢弃分数阈值 (默认: 0.0)
+    - `max_pages`: 对于多页PDF，限制最多处理和返回的页面数 (默认: 2)
+
+- `POST /api/ocr/ocr2text` - 提取纯文本
+  - 参数：
+    - `ocr_result`: OCR结果的JSON字符串
+
+- `POST /api/ocr/load` - 加载OCR模型
+- `POST /api/ocr/unload` - 卸载OCR模型
+- `GET /api/ocr/model_status` - 获取OCR模型状态
+
+#### PP-Structure 接口
+
+- `POST /api/ppstructure/` - PP-Structure分析
+  - 参数：
+    - `file`: 上传的图像或PDF文件
+    - `ocr_det_db_thresh`: OCR检测阈值 (默认: 0.3)
+    - `unclip_ratio`: 文本框扩大比例 (默认: 2.0)
+    - `merge_overlaps`: 是否合并重叠框 (默认: False)
+    - `overlap_threshold`: 重叠阈值 (默认: 0.9)
+    - `merge_layout`: 是否合并布局 (默认: False)
+    - `layout_overlap_threshold`: 布局重叠阈值 (默认: 0.9)
+    - `use_cls`: 是否使用方向分类 (默认: True)
+    - `cls_thresh`: 分类阈值 (默认: 0.9)
+
+- `POST /api/ppstructure/draw` - 绘制PP-Structure结果
+  - 参数：
+    - `file`: 上传的图像或PDF文件
+    - `analysis_result`: 结构分析结果的JSON字符串
+    - `page_number`: 对于单页PDF的可视化指定页码 (默认: 1)
+    - `max_pages`: 对于多页PDF，限制最多处理和返回的页面数 (默认: 2)
+
+- `POST /api/ppstructure/markdown` - 生成Markdown
+  - 参数：
+    - `file`: 上传的图像或PDF文件
+    - `analysis_result`: 结构分析结果的JSON字符串
+
+- `POST /api/ppstructure/load` - 加载PP-Structure模型
+- `POST /api/ppstructure/unload` - 卸载PP-Structure模型
+- `GET /api/ppstructure/model_status` - 获取PP-Structure模型状态
+
+#### 通用接口
+
+- `GET /api/health` - 健康检查
+- `GET /api/models/list` - 列出可用模型
+- `POST /api/models/download/{model_name}` - 下载模型
+- `POST /api/models/batch-download` - 批量下载模型
 
 ### 响应格式
 
+#### OCR识别响应
 ```json
 {
   "results": [
     {
       "text": "识别的文本内容",
       "confidence": 0.95,
-      "bbox": [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+      "bbox": [[x1,y1], [x2,y2], [x3,y3], [x4,y4]],
+      "text_confidence": 0.95
+    }
+  ]
+}
+```
+
+#### PDF文件OCR响应
+```json
+{
+  "file_type": "pdf",
+  "total_pages": 5,
+  "results": [
+    {
+      "page": 1,
+      "results": [
+        {
+          "text": "页面1的文本",
+          "confidence": 0.95,
+          "bbox": [[x1,y1], [x2,y2], [x3,y3], [x4,y4]],
+          "text_confidence": 0.95,
+          "rotation": 0
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### 绘制结果响应 (PDF)
+```json
+{
+  "file_type": "pdf",
+  "total_pages": 5,
+  "processed_pages": 2,
+  "max_pages_limit": 2,
+  "images": [
+    {
+      "page_number": 1,
+      "data": "base64编码的PNG图片数据"
     }
   ]
 }
