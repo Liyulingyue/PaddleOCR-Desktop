@@ -27,6 +27,11 @@ a = Analysis(
         'pdf2image',
         'python-multipart',
         'fitz',  # pymupdf
+        'requests',
+        'modelscope',
+        'shutil',
+        'tarfile',
+        'tempfile',
     ],
     hookspath=[],
     hooksconfig={},

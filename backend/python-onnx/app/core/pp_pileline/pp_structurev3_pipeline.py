@@ -119,16 +119,16 @@ class PPStructureV3Pipeline:
         self.layout_model = None
         self._loaded = False
 
-    def load(self) -> bool:
+    def load(self) -> tuple[bool, str]:
         """
         加载所有文档结构分析模型
 
         Returns:
-            bool: 加载是否成功
+            tuple: (success: bool, error_message: str)
         """
         try:
             if self._loaded:
-                return True
+                return True, ""
 
             # 检查模型路径是否存在
             from pathlib import Path
@@ -146,11 +146,12 @@ class PPStructureV3Pipeline:
                 missing_models.append(f"OCR Classification model: {self.ocr_pipeline.cls_model_path}")
             
             if missing_models:
-                print("Error: The following model files are missing:")
+                error_msg = "模型文件缺失！请前往模型管理页面下载以下模型：\n"
                 for missing in missing_models:
-                    print(f"  - {missing}")
-                print("Please ensure all model files exist or run model download commands.")
-                return False
+                    error_msg += f"  - {missing}\n"
+                error_msg += "\n需要下载的模型：PP-DocLayout-L, PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_textline_ori"
+                print("Error: " + error_msg)
+                return False, error_msg
 
             # 初始化布局检测模型
             self.layout_model = PPDocLayoutONNX(
@@ -161,15 +162,17 @@ class PPStructureV3Pipeline:
             )
 
             # 加载OCR流水线
-            if not self.ocr_pipeline.load():
-                raise RuntimeError("Failed to load OCR pipeline")
+            success, error_msg = self.ocr_pipeline.load()
+            if not success:
+                raise RuntimeError(f"Failed to load OCR pipeline: {error_msg}")
 
             self._loaded = True
-            return True
+            return True, ""
         except Exception as e:
+            error_msg = f"加载PP-StructureV3模型失败: {e}"
             print(f"Failed to load PP-StructureV3 models: {e}")
             self.unload()  # 清理部分加载的模型
-            return False
+            return False, error_msg
 
     def unload(self) -> bool:
         """
@@ -321,8 +324,9 @@ class PPStructureV3Pipeline:
         """
         if not self._loaded:
             print("Models not loaded, auto-loading...")
-            if not self.load():
-                raise RuntimeError("Failed to auto-load models.")
+            success, error_msg = self.load()
+            if not success:
+                raise RuntimeError(f"Failed to auto-load models: {error_msg}")
 
         # 预处理图像
         if isinstance(image, str):

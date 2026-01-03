@@ -26,6 +26,32 @@
 
 **重要说明**: 构建脚本会自动将后端exe复制到Tauri目录，并通过Rust命令管理后端进程生命周期。现在支持随机端口分配，避免端口冲突！✅
 
+### 模型包分发 📦
+
+为了减小主程序包体积，**模型文件已从主程序包中分离**，作为独立的资源包分发：
+
+#### 构建模型包
+```bash
+# 构建独立的模型包
+.\scripts\build_models_package.ps1
+
+# 或指定输出路径
+.\scripts\build_models_package.ps1 -OutputPath "C:\path\to\models-package.zip"
+```
+
+#### 模型包使用方式
+1. **解压模型包** 到任意目录
+2. **设置环境变量**：
+   ```cmd
+   set PPOCR_MODELS_DIR=C:\path\to\extracted\models
+   ```
+3. **或将 `models` 文件夹** 放在可执行文件同级目录
+
+#### 模型包内容
+- 包含所有OCR和文档结构分析模型
+- 约 200-300MB 大小
+- 支持独立更新和分发
+
 ### 新的架构优势
 
 #### **智能端口管理**

@@ -27,6 +27,10 @@ export function BackendLogPanel() {
     }
   }
 
+  const clearLogs = () => {
+    setLogs('')
+  }
+
   return (
     <div style={{ position: 'fixed', right: 12, bottom: 12, zIndex: 1000 }}>
       <button onClick={() => { setVisible((v) => !v); if (!visible) fetchLogs() }} style={{ padding: '6px 10px' }}>
@@ -37,7 +41,8 @@ export function BackendLogPanel() {
         <div style={{ width: 640, height: 360, marginTop: 8, background: '#fff', border: '1px solid #ddd', padding: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', overflow: 'auto' }}>
           <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{logs || 'No logs yet'}</pre>
           <div style={{ marginTop: 8, textAlign: 'right' }}>
-            <button onClick={() => fetchLogs()}>Refresh</button>
+            <button onClick={() => fetchLogs()} style={{ marginRight: 8 }}>Refresh</button>
+            <button onClick={() => clearLogs()} style={{ backgroundColor: '#ff6b6b', color: 'white' }}>Clear</button>
           </div>
         </div>
       )}

@@ -43,41 +43,19 @@ def main():
     os.environ['TAURI_MODE'] = 'true'
 
     # 设置模型目录路径
+    # 优先使用环境变量，否则使用应用目录下的 models 目录
     if getattr(sys, 'frozen', False):
-        # 打包后，PyInstaller 在临时目录运行，但我们需要找到原始 bundle
-        # Tauri 将 exe 放在 bundle\binaries\，models 在 bundle\models\
+        # Tauri 打包应用
         exe_path = Path(sys.executable)
-        
-        # 尝试从 exe 位置向上查找 models 目录
-        current_dir = exe_path.parent
-        models_dir = None
-        
-        # 向上查找最多 5 级目录
-        for _ in range(5):
-            candidate = current_dir / 'models'
-            if candidate.exists() and candidate.is_dir():
-                models_dir = candidate
-                break
-            current_dir = current_dir.parent
-        
-        if models_dir and models_dir.exists():
-            os.environ['PPOCR_MODELS_DIR'] = str(models_dir)
-            print(f"[INFO] Models directory found at: {models_dir}")
-        else:
-            print(f"[WARNING] Models directory not found, searching from: {exe_path.parent}")
-            # 备用：使用 exe 所在目录的父目录的父目录
-            bundle_root = exe_path.parent.parent
-            models_dir = bundle_root / 'models'
-            if models_dir.exists():
-                os.environ['PPOCR_MODELS_DIR'] = str(models_dir)
-                print(f"[INFO] Models directory found at fallback location: {models_dir}")
-            else:
-                print(f"[ERROR] Models directory not found at {models_dir}")
+        models_dir = exe_path.parent / 'models'
+        os.environ['PPOCR_MODELS_DIR'] = str(models_dir)
+        print(f"[INFO] Tauri mode: Using models directory: {models_dir}")
     else:
         # 开发时
         script_dir = Path(__file__).parent
         models_dir = script_dir / 'models'
         os.environ['PPOCR_MODELS_DIR'] = str(models_dir)
+        print(f"[INFO] Development mode: Using models directory: {models_dir}")
 
     # 查找可用端口
     backend_port = find_random_available_port(1024, 65535)

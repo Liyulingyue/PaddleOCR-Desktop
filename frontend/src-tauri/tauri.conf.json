@@ -17,9 +17,6 @@
       "externalBin": [
         "binaries/paddleocr_backend"
       ],
-      "resources": [
-        "models"
-      ],
       "category": "Productivity",
       "shortDescription": "",
       "longDescription": "",

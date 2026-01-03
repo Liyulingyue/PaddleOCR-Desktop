@@ -13,10 +13,11 @@ interface SidebarProps {
   onShowApiModal: () => void
   apiBaseUrl?: string
   onMessage?: (msg: string) => void
+  onShowErrorModal?: (data: {title: string, message: string, missingFiles?: string[]}) => void
   pageType?: string
 }
 
-function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, pageType = 'ocr' }: SidebarProps) {
+function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, onShowErrorModal, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [ppstructureOcrConfigExpanded, setPpstructureOcrConfigExpanded] = useState(false)
 
@@ -61,7 +62,25 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         setModelLoaded(true)
       } else {
         const t = await res.text()
-        showMsg(`加载模型失败: ${res.status} ${t}`)
+        let errorMessage = `加载模型失败: ${res.status} ${t}`
+        showMsg(errorMessage)
+        
+        // 检查是否为模型文件缺失错误
+        try {
+          const errorData = JSON.parse(t)
+          if (errorData.error && (errorData.error.includes('模型文件不完整') || errorData.error.includes('模型文件缺失'))) {
+            if (onShowErrorModal) {
+              const missingFiles = errorData.missing_files || []
+              onShowErrorModal({
+                title: '⚠️ 模型文件缺失',
+                message: '模型加载失败，检测到模型文件缺失，请前往模型管理页面下载所需的模型。',
+                missingFiles: missingFiles
+              })
+            }
+          }
+        } catch (parseErr) {
+          // 如果不是JSON，忽略
+        }
       }
     } catch (err) {
       showMsg('加载模型失败：网络错误')

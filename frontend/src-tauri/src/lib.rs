@@ -332,15 +332,15 @@ pub fn run() {
                             #[cfg(debug_assertions)]
                             println!("✅ 后端启动任务已提交到后台,主线程立即返回以保持窗口响应");
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             #[cfg(debug_assertions)]
-                            eprintln!("❌ 启动后端进程失败: {}", e);
+                            eprintln!("❌ 启动后端进程失败: {}", _e);
                         }
                     }
                 }
-                Err(e) => {
+                Err(_e) => {
                     #[cfg(debug_assertions)]
-                    eprintln!("❌ 创建后端命令失败: {}", e);
+                    eprintln!("❌ 创建后端命令失败: {}", _e);
                 }
             }
 

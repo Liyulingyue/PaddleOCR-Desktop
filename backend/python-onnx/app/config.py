@@ -22,7 +22,10 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 def get_models_dir():
-    return os.environ.get("PPOCR_MODELS_DIR", DEFAULT_MODELS_DIR)
+    models_dir = os.environ.get("PPOCR_MODELS_DIR", DEFAULT_MODELS_DIR)
+    # 确保目录存在
+    Path(models_dir).mkdir(parents=True, exist_ok=True)
+    return models_dir
 
 def get_work_dir():
     """获取工作目录（比models目录高一级，通常是项目根目录）"""

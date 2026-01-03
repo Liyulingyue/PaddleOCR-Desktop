@@ -116,8 +116,9 @@ class PPOCRv5Pipeline:
         """
         if not self.is_loaded():
             print("PP-OCRv5 models not loaded, auto-loading...")
-            if not self.load():
-                raise RuntimeError("Failed to auto-load PP-OCRv5 models.")
+            success, error_msg = self.load()
+            if not success:
+                raise RuntimeError(f"Failed to auto-load PP-OCRv5 models: {error_msg}")
             
         if isinstance(image, str):
             image = cv2.imread(image)
@@ -240,17 +241,17 @@ class PPOCRv5Pipeline:
         
         return merged_results
 
-    def load(self) -> bool:
+    def load(self) -> tuple[bool, str]:
         """
         Load the OCR pipeline models.
         
         Returns:
-            bool: True if loading successful, False otherwise
+            tuple: (success: bool, error_message: str)
         """
         try:
             if self.is_loaded():
                 print("Models already loaded")
-                return True
+                return True, ""
             
             print("Loading PP-OCRv5 Pipeline models...")
             
@@ -266,11 +267,12 @@ class PPOCRv5Pipeline:
                 missing_models.append(f"Recognition model: {self.rec_model_path}")
             
             if missing_models:
-                print("Error: The following model files are missing:")
+                error_msg = "模型文件缺失！请前往模型管理页面下载以下模型：\n"
                 for missing in missing_models:
-                    print(f"  - {missing}")
-                print("Please ensure all model files exist or run model download commands.")
-                return False
+                    error_msg += f"  - {missing}\n"
+                error_msg += "\n需要下载的模型：PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_textline_ori"
+                print("Error: " + error_msg)
+                return False, error_msg
             
             # Initialize orientation classifier
             self.cls_model = PPLCNetDocONNX(model_path=self.cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
@@ -282,13 +284,14 @@ class PPOCRv5Pipeline:
             self.rec_model = PPOCRv5RecONNX(model_path=self.rec_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
             
             print("PP-OCRv5 Pipeline models loaded successfully!")
-            return True
+            return True, ""
             
         except Exception as e:
+            error_msg = f"加载PP-OCRv5模型失败: {e}"
             print(f"Failed to load PPOCRv5Pipeline models: {e}")
             # Clean up any partially loaded models
             self.unload()
-            return False
+            return False, error_msg
 
     def unload(self) -> bool:
         """
@@ -343,8 +346,9 @@ class PPOCRv5Pipeline:
         """
         if not self.is_loaded():
             print("PP-OCRv5 models not loaded, auto-loading...")
-            if not self.load():
-                raise RuntimeError("Failed to auto-load PP-OCRv5 models.")
+            success, error_msg = self.load()
+            if not success:
+                raise RuntimeError(f"Failed to auto-load PP-OCRv5 models: {error_msg}")
             
         # First, apply the same rotation as in ocr()
         angle = 0

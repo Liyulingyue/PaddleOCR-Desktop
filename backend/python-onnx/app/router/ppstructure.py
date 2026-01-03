@@ -513,8 +513,19 @@ async def load_model():
         ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
         ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
-        if not all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()]):
-            return JSONResponse(status_code=500, content={"error": "模型文件不完整"})
+        missing_files = []
+        if not layout_model_path.exists():
+            missing_files.append("PP-DocLayout-L-ONNX/inference.onnx")
+        if not ocr_det_model.exists():
+            missing_files.append("PP-OCRv5_mobile_det-ONNX/inference.onnx")
+        if not ocr_rec_model.exists():
+            missing_files.append("PP-OCRv5_mobile_rec-ONNX/inference.onnx")
+        if not ocr_cls_model.exists():
+            missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
+
+        if missing_files:
+            error_msg = f"模型文件不完整，缺少以下文件：\n" + "\n".join(f"  - {file}" for file in missing_files)
+            return JSONResponse(status_code=500, content={"error": error_msg, "missing_files": missing_files})
 
         # 获取或创建全局pipeline实例
         pipeline = get_global_pipeline()

@@ -3,6 +3,7 @@ import ControlBar from '../components/ControlBar'
 import Viewer from '../components/Viewer'
 import ResultPanel from '../components/ResultPanel'
 import ApiModal from '../components/ApiModal'
+import ErrorModal from '../components/ErrorModal'
 import { getCachedApiBaseUrl } from '../utils/api'
 
 function PPStructureV3Page() {
@@ -27,6 +28,8 @@ function PPStructureV3Page() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorModalData, setErrorModalData] = useState<{title: string, message: string, missingFiles?: string[]} | null>(null)
   const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
 
   // 用于管理消息自动清除的定时器
@@ -139,7 +142,28 @@ function PPStructureV3Page() {
         }
         setResult(layoutRegions)
       } else {
-        setError(analysisResult.error || '上传失败')
+        // 检查是否为模型加载失败错误
+        const errorMessage = analysisResult.error || '上传失败'
+        if (errorMessage.includes('模型文件不完整')) {
+          // 显示模态框提示缺失的文件
+          const missingFiles = analysisResult.missing_files || []
+          setErrorModalData({
+            title: '⚠️ 模型文件不完整',
+            message: '检测到模型文件缺失，请前往模型管理页面下载所需的模型。',
+            missingFiles: missingFiles
+          })
+          setShowErrorModal(true)
+          setError(`模型文件不完整，请下载缺失的模型文件`)
+        } else if (errorMessage.includes('Failed to auto-load') || errorMessage.includes('模型文件缺失')) {
+          setErrorModalData({
+            title: '⚠️ 模型文件缺失',
+            message: `模型文件缺失！请前往模型管理页面下载所需的模型。\n\n${errorMessage}`
+          })
+          setShowErrorModal(true)
+          setError(`⚠️ 模型文件缺失！请前往模型管理页面下载所需的模型。\n\n${errorMessage}`)
+        } else {
+          setError(errorMessage)
+        }
       }
 
       // Fetch markdown content
@@ -269,10 +293,22 @@ function PPStructureV3Page() {
         onConfigChange={handleConfigChange}
         onShowApiModal={() => setShowApiModal(true)}
         pageType="ppstructure"
+        onShowErrorModal={(data) => {
+          setErrorModalData(data)
+          setShowErrorModal(true)
+        }}
       />
       
       <Viewer file={file} />
       <ResultPanel result={result} imageFile={file} drawnImage={drawnImage} onMessage={setMessageWithAutoClear} resultType="layout" viewOptions={['json', 'drawn-image', 'markdown']} markdownContent={markdownContent} markdownImageData={markdownImageData} markdownImages={markdownImages} />
+
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title={errorModalData?.title || ''}
+        message={errorModalData?.message || ''}
+        missingFiles={errorModalData?.missingFiles}
+      />
 
       <ApiModal
         isOpen={showApiModal}
