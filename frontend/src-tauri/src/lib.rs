@@ -112,6 +112,7 @@ fn cleanup_pyinstaller_temp() {
             println!("🔍 检查临时目录: {}", temp_dir);
 
             if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+                #[cfg(debug_assertions)]
                 let mut cleaned = 0;
                 for entry in entries.flatten() {
                     if let Ok(metadata) = entry.metadata() {
@@ -123,9 +124,11 @@ fn cleanup_pyinstaller_temp() {
                                     println!("🗑️ 尝试删除 PyInstaller 临时目录: {}", file_name);
                                     match std::fs::remove_dir_all(&path) {
                                         Ok(_) => {
-                                            cleaned += 1;
                                             #[cfg(debug_assertions)]
-                                            println!("✅ 已删除: {}", file_name);
+                                            {
+                                                cleaned += 1;
+                                                println!("✅ 已删除: {}", file_name);
+                                            }
                                         }
                                         Err(e) => {
                                             #[cfg(debug_assertions)]

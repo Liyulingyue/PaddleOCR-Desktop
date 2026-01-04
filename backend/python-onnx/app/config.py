@@ -14,11 +14,18 @@ PaddleOCR Desktop 配置文件
 """
 
 import os
+import sys
 from pathlib import Path
 import requests
 from typing import Dict, Any, Optional
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+def _resolve_base_dir() -> str:
+    # Prefer the executable directory when bundled (PyInstaller, etc.)
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+BASE_DIR = _resolve_base_dir()
 DEFAULT_MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 def get_models_dir():
