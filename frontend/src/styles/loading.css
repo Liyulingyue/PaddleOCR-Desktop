@@ -1,0 +1,186 @@
+.loading-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  z-index: 9999;
+}
+
+.loading-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+  max-width: 500px;
+  padding: 2rem;
+}
+
+.logo-container {
+  margin-bottom: 3rem;
+}
+
+.logo-container h1 {
+  font-size: 2.5rem;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* 旋转加载动画 */
+.spinner {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 2rem;
+  border: 4px solid rgba(102, 126, 234, 0.3);
+  border-top: 4px solid #667eea;
+  border-right: 4px solid #764ba2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-section {
+  margin: 2rem 0;
+}
+
+.status-section h2 {
+  font-size: 1.3rem;
+  margin: 0 0 1.5rem 0;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.status-details {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.elapsed-time {
+  font-size: 1.8rem;
+  color: #667eea;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.endpoints-checked {
+  margin-top: 1rem;
+  text-align: left;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.endpoints-checked .label {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.endpoints-checked ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.endpoints-checked li {
+  font-size: 0.75rem;
+  color: #999;
+  padding: 0.25rem 0;
+  word-break: break-all;
+  font-family: 'Courier New', monospace;
+}
+
+.error-section {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  color: #ff6b6b;
+}
+
+.error-section p {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+}
+
+.retry-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+}
+
+.retry-btn:active {
+  transform: translateY(0);
+}
+
+.tips {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: #aaa;
+  font-style: italic;
+}
+
+.tips p {
+  margin: 0.5rem 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .loading-content {
+    padding: 1rem;
+  }
+
+  .logo-container h1 {
+    font-size: 2rem;
+  }
+
+  .status-section h2 {
+    font-size: 1.1rem;
+  }
+
+  .spinner {
+    width: 50px;
+    height: 50px;
+  }
+}
