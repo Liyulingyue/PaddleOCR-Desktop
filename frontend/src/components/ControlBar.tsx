@@ -37,16 +37,22 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
 
   const fetchModelStatus = async () => {
     try {
-      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/model_status`)
+      const url = `${apiBaseUrl}${getApiPrefix()}/model_status`
+      console.log('Fetching model status from:', url)
+      const res = await fetch(url)
+      console.log('Model status response:', res.status, res.ok)
       if (res.ok) {
         const j = await res.json()
+        console.log('Model status data:', j)
         setModelLoaded(Boolean(j.loaded))
         return j.loaded
       } else {
         const t = await res.text()
+        console.log('Model status error response:', t)
         showMsg(`查询模型状态失败: ${res.status} ${t}`)
       }
     } catch (err) {
+      console.log('Model status fetch error:', err)
       showMsg('查询模型状态失败：网络错误')
     }
     setModelLoaded(null)
@@ -118,9 +124,11 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
 
   // 自动在组件挂载时预加载当前状态
   useEffect(() => {
-    fetchModelStatus()
+    if (apiBaseUrl) {
+      fetchModelStatus()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [apiBaseUrl])
 
   return (
     <aside className="control-bar">

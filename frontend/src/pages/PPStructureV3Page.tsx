@@ -292,6 +292,7 @@ function PPStructureV3Page() {
         config={config}
         onConfigChange={handleConfigChange}
         onShowApiModal={() => setShowApiModal(true)}
+        apiBaseUrl={apiBaseUrl}
         pageType="ppstructure"
         onShowErrorModal={(data) => {
           setErrorModalData(data)

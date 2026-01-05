@@ -130,9 +130,9 @@ fn cleanup_pyinstaller_temp() {
                                                 println!("✅ 已删除: {}", file_name);
                                             }
                                         }
-                                        Err(e) => {
+                                        Err(_e) => {
                                             #[cfg(debug_assertions)]
-                                            println!("⚠️ 无法删除 {} (可能仍在使用): {}", file_name, e);
+                                            println!("⚠️ 无法删除 {} (可能仍在使用): {}", file_name, _e);
                                         }
                                     }
                                 }
@@ -469,6 +469,22 @@ fn get_backend_url(state: tauri::State<AppState>) -> String {
             append_log_message_and_emit(None, "⚠️  后端端口未设置，使用默认地址 http://localhost:8002");
             "http://localhost:8002".to_string()
         }
+    }
+}
+
+// 读取日志文件内容
+#[tauri::command]
+fn read_backend_logs() -> Result<String, String> {
+    if let Some(mut data_dir) = dirs::data_local_dir() {
+        data_dir.push("PaddleOCRDesktop");
+        data_dir.push("logs");
+        data_dir.push("app.log");
+        match std::fs::read_to_string(&data_dir) {
+            Ok(content) => Ok(content),
+            Err(e) => Err(format!("read failed: {}", e)),
+        }
+    } else {
+        Err("no data dir".into())
     }
 }
 
