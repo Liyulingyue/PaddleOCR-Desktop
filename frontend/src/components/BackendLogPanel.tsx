@@ -27,8 +27,15 @@ export function BackendLogPanel() {
     }
   }
 
-  const clearLogs = () => {
-    setLogs('')
+  const clearLogs = async () => {
+    try {
+      await invoke('clear_backend_logs')
+      setLogs('')
+    } catch (e) {
+      console.error('Failed to clear logs:', e)
+      // 即使后端清空失败，也清空前端显示
+      setLogs('')
+    }
   }
 
   return (

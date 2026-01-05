@@ -11,6 +11,7 @@ from typing import List, Dict, Tuple
 import yaml
 
 from .onnx_model_base import ONNXModelBase
+from ...config import get_model_path_from_registry
 
 
 class PPOCRv5RecONNX(ONNXModelBase):
@@ -24,13 +25,14 @@ class PPOCRv5RecONNX(ONNXModelBase):
             gpu_id: GPU device ID
         """
         if model_path is None:
-            # Default path relative to project root
-            import os
-            project_root = Path(__file__).parent.parent.parent.parent  # backend/python-onnx/app/core -> project root
-            model_path = project_root / 'models' / 'PP-OCRv5_mobile_rec-ONNX' / 'inference.onnx'
+            # Use unified model path resolution
+            model_dir = get_model_path_from_registry("PP-OCRv5_mobile_rec-ONNX")
+            if model_dir is None:
+                raise FileNotFoundError("PP-OCRv5_mobile_rec-ONNX model not found in registry")
+            model_path = model_dir
 
-        self.model_path = Path(model_path)
-        self.yml_path = self.model_path.parent / 'inference.yml'
+        self.model_path = Path(model_path) / 'inference.onnx'
+        self.yml_path = Path(model_path) / 'inference.yml'
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model not found at {self.model_path}")
         if not self.yml_path.exists():

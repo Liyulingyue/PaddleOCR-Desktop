@@ -26,17 +26,26 @@ def _resolve_base_dir() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 BASE_DIR = _resolve_base_dir()
-DEFAULT_MODELS_DIR = os.path.join(BASE_DIR, "models")
-
-def get_models_dir():
-    models_dir = os.environ.get("PPOCR_MODELS_DIR", DEFAULT_MODELS_DIR)
-    # 确保目录存在
-    Path(models_dir).mkdir(parents=True, exist_ok=True)
-    return models_dir
 
 def get_work_dir():
-    """获取工作目录（比models目录高一级，通常是项目根目录）"""
-    return BASE_DIR
+    """获取工作目录（模型目录的上一级），防止出现 models/models 重复层级。"""
+    env_dir = os.environ.get("PPOCR_MODELS_DIR")
+
+    if env_dir:
+        work_root = Path(env_dir)
+        # 如果传入的就是 models 目录本身，则使用其父目录作为工作目录，避免重复拼接
+        if work_root.name == "models":
+            work_root = work_root.parent
+    else:
+        work_root = Path(BASE_DIR)
+
+    # 确保真正的模型存储目录存在（位于工作目录下的 models/）
+    (work_root / "models").mkdir(parents=True, exist_ok=True)
+    return str(work_root)
+
+def get_models_dir():
+    """兼容旧接口，返回工作目录（非 models 子目录）。"""
+    return get_work_dir()
 
 # =============================================================================
 # 模型注册表：模型名称到下载源的映射
@@ -103,14 +112,14 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "layout_det": "PP-DocLayout-L-ONNX",
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
-            "doc_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
+            "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
         },
     },
     "ppocrv5": {
         "models": {
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
-            "doc_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
+            "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
         },
     }
 }
@@ -288,7 +297,7 @@ def get_model_path_from_registry(model_name: str) -> Optional[str]:
         return None
 
     config = MODEL_REGISTRY[model_name]
-    models_dir = Path(get_models_dir())
+    models_dir = Path(get_work_dir())
     local_path = models_dir / config["local_path"]
 
     if local_path.exists():
@@ -325,9 +334,12 @@ def download_model(config: Dict[str, Any], models_dir: Path) -> bool:
                 temp_model_path = Path(temp_dir) / "inference.onnx"  # 假设模型文件名为inference.onnx
 
                 if temp_model_path.exists():
-                    # 复制到目标位置
+                    # 复制整个目录到目标位置
                     import shutil
-                    shutil.copy2(temp_model_path, local_path)
+                    target_dir = local_path.parent / local_path.name
+                    if target_dir.exists():
+                        shutil.rmtree(target_dir)
+                    shutil.copytree(temp_dir, target_dir)
                     print(f"Successfully downloaded from ModelScope: {config['modelscope_id']}")
                     return True
                 else:

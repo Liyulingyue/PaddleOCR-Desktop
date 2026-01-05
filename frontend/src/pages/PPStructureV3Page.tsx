@@ -112,7 +112,7 @@ function PPStructureV3Page() {
 
     try {
       // Fetch layout detection result
-      const response = await fetch('/api/ppstructure', {
+      const response = await fetch(`${apiBaseUrl}/api/ppstructure`, {
         method: 'POST',
         body: formData,
       })
@@ -170,7 +170,7 @@ function PPStructureV3Page() {
       const markdownFormData = new FormData()
       markdownFormData.append('file', file)
       markdownFormData.append('analysis_result', JSON.stringify(analysisResult))
-      const markdownResponse = await fetch('/api/ppstructure/markdown', {
+      const markdownResponse = await fetch(`${apiBaseUrl}/api/ppstructure/markdown`, {
         method: 'POST',
         body: markdownFormData,
       })
@@ -207,7 +207,7 @@ function PPStructureV3Page() {
       const drawFormData = new FormData()
       drawFormData.append('file', file)
       drawFormData.append('analysis_result', JSON.stringify(analysisResult))
-      const drawResponse = await fetch('/api/ppstructure/draw', {
+      const drawResponse = await fetch(`${apiBaseUrl}/api/ppstructure/draw`, {
         method: 'POST',
         body: drawFormData,
       })

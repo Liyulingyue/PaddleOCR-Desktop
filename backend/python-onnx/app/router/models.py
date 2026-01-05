@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 from typing import List, Dict, Any
 import os
-from ..config import MODEL_REGISTRY, get_models_dir, get_work_dir
+from ..config import MODEL_REGISTRY, get_work_dir
 
 def get_directory_size(path: Path) -> int:
     """

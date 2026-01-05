@@ -385,7 +385,7 @@ pub fn run() {
                 _ => {}
             }
         })
-        .invoke_handler(tauri::generate_handler![get_backend_url, start_backend, read_backend_logs])
+        .invoke_handler(tauri::generate_handler![get_backend_url, start_backend, read_backend_logs, clear_backend_logs])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -472,16 +472,16 @@ fn get_backend_url(state: tauri::State<AppState>) -> String {
     }
 }
 
-// 读取磁盘日志内容, 返回字符串
+// 清空日志文件内容
 #[tauri::command]
-fn read_backend_logs() -> Result<String, String> {
+fn clear_backend_logs() -> Result<(), String> {
     if let Some(mut data_dir) = dirs::data_local_dir() {
         data_dir.push("PaddleOCRDesktop");
         data_dir.push("logs");
         data_dir.push("app.log");
-        match std::fs::read_to_string(&data_dir) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(format!("read failed: {}", e)),
+        match std::fs::write(&data_dir, "") {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("clear failed: {}", e)),
         }
     } else {
         Err("no data dir".into())

@@ -11,6 +11,7 @@ from typing import List, Dict, Tuple
 import yaml
 
 from .onnx_model_base import ONNXModelBase
+from ...config import get_model_path_from_registry
 
 
 class PPLCNetDocONNX(ONNXModelBase):
@@ -24,13 +25,14 @@ class PPLCNetDocONNX(ONNXModelBase):
             gpu_id: GPU device ID
         """
         if model_path is None:
-            # Default path relative to project root
-            import os
-            project_root = Path(__file__).parent.parent.parent.parent  # backend/python-onnx/app/core -> project root
-            model_path = project_root / 'models' / 'PP-LCNet_x1_0_doc_ori-ONNX' / 'inference.onnx'
+            # Use unified model path resolution
+            model_dir = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
+            if model_dir is None:
+                raise FileNotFoundError("PP-LCNet_x1_0_doc_ori-ONNX model not found in registry")
+            model_path = model_dir
 
-        self.model_path = Path(model_path)
-        self.yml_path = self.model_path.parent / 'inference.yml'
+        self.model_path = Path(model_path) / 'inference.onnx'
+        self.yml_path = Path(model_path) / 'inference.yml'
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model not found at {self.model_path}")
         if not self.yml_path.exists():

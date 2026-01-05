@@ -13,6 +13,8 @@ try:
 except ImportError:
     HAS_PIPELINE = False
 
+from ..config import get_work_dir
+
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
 
@@ -393,10 +395,10 @@ async def load_model():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models"
-        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        models_dir = Path(get_work_dir())
+        det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         missing_files = []
         if not det_model.exists():
@@ -457,10 +459,10 @@ async def model_status():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models"
-        det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        models_dir = Path(get_work_dir())
+        det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         models_exist = all([det_model.exists(), rec_model.exists(), cls_model.exists()])
 

@@ -21,6 +21,8 @@ try:
 except ImportError:
     HAS_PIPELINE = False
 
+from ..config import get_work_dir
+
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
 
@@ -507,11 +509,11 @@ async def load_model():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models"
-        layout_model_path = models_dir / "PP-DocLayout-L-ONNX" / "inference.onnx"
-        ocr_det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        models_dir = Path(get_work_dir())
+        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX" / "inference.onnx"
+        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         missing_files = []
         if not layout_model_path.exists():
@@ -575,11 +577,11 @@ async def model_status():
 
         # 检查模型文件是否存在
         from pathlib import Path
-        models_dir = Path(__file__).parent.parent.parent / "models"
-        layout_model_path = models_dir / "PP-DocLayout-L-ONNX" / "inference.onnx"
-        ocr_det_model = models_dir / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        ocr_rec_model = models_dir / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        ocr_cls_model = models_dir / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        models_dir = Path(get_work_dir())
+        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX" / "inference.onnx"
+        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
+        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
+        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
 
         models_exist = all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()])
 
