@@ -154,7 +154,7 @@ function PPStructureV3Page() {
           })
           setShowErrorModal(true)
           setError(`模型文件不完整，请下载缺失的模型文件`)
-        } else if (errorMessage.includes('Failed to auto-load') || errorMessage.includes('模型文件缺失')) {
+        } else if (errorMessage.includes('Failed to auto-load') || errorMessage.includes('模型文件缺失') || errorMessage.includes('Required model paths not found in config') || errorMessage.includes('Required model paths must be provided')) {
           setErrorModalData({
             title: '⚠️ 模型文件缺失',
             message: `模型文件缺失！请前往模型管理页面下载所需的模型。\n\n${errorMessage}`
@@ -164,6 +164,8 @@ function PPStructureV3Page() {
         } else {
           setError(errorMessage)
         }
+        setLoading(false)
+        return
       }
 
       // Fetch markdown content
@@ -293,6 +295,7 @@ function PPStructureV3Page() {
         onConfigChange={handleConfigChange}
         onShowApiModal={() => setShowApiModal(true)}
         apiBaseUrl={apiBaseUrl}
+        onMessage={setMessageWithAutoClear}
         pageType="ppstructure"
         onShowErrorModal={(data) => {
           setErrorModalData(data)

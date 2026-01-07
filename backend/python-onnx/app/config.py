@@ -340,6 +340,14 @@ def download_model(config: Dict[str, Any], models_dir: Path) -> bool:
                     if target_dir.exists():
                         shutil.rmtree(target_dir)
                     shutil.copytree(temp_dir, target_dir)
+                    
+                    # 清理临时目录
+                    try:
+                        shutil.rmtree(temp_dir)
+                        print(f"Cleaned up temporary directory: {temp_dir}")
+                    except Exception as cleanup_error:
+                        print(f"Warning: Failed to clean up temporary directory {temp_dir}: {cleanup_error}")
+                    
                     print(f"Successfully downloaded from ModelScope: {config['modelscope_id']}")
                     return True
                 else:

@@ -510,19 +510,21 @@ async def load_model():
         # 检查模型文件是否存在
         from pathlib import Path
         models_dir = Path(get_work_dir())
-        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX" / "inference.onnx"
-        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        # 注意：模型路径应该是目录路径，模型类会自动在内部拼接 /inference.onnx
+        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX"
+        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
+        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
+        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
 
+        # 检查模型目录内是否存在 inference.onnx 文件
         missing_files = []
-        if not layout_model_path.exists():
+        if not (layout_model_path / "inference.onnx").exists():
             missing_files.append("PP-DocLayout-L-ONNX/inference.onnx")
-        if not ocr_det_model.exists():
+        if not (ocr_det_model / "inference.onnx").exists():
             missing_files.append("PP-OCRv5_mobile_det-ONNX/inference.onnx")
-        if not ocr_rec_model.exists():
+        if not (ocr_rec_model / "inference.onnx").exists():
             missing_files.append("PP-OCRv5_mobile_rec-ONNX/inference.onnx")
-        if not ocr_cls_model.exists():
+        if not (ocr_cls_model / "inference.onnx").exists():
             missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
 
         if missing_files:
@@ -549,6 +551,39 @@ async def load_model():
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Failed to load models: {str(e)}"})
+
+
+@router.post("/download_missing")
+async def download_missing_models():
+    """下载缺失的PP-StructureV3模型（仅下载，不加载到内存）"""
+    try:
+        from ..config import get_model_path_from_registry
+        
+        # 尝试获取所有模型路径，如果缺失会自动下载
+        try:
+            layout_model_path = get_model_path_from_registry("PP-DocLayout-L-ONNX")
+            ocr_det_model = get_model_path_from_registry("PP-OCRv5_mobile_det-ONNX")
+            ocr_rec_model = get_model_path_from_registry("PP-OCRv5_mobile_rec-ONNX")
+            ocr_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
+            
+            if not all([layout_model_path, ocr_det_model, ocr_rec_model, ocr_cls_model]):
+                missing = []
+                if not layout_model_path:
+                    missing.append("PP-DocLayout-L-ONNX")
+                if not ocr_det_model:
+                    missing.append("PP-OCRv5_mobile_det-ONNX")
+                if not ocr_rec_model:
+                    missing.append("PP-OCRv5_mobile_rec-ONNX")
+                if not ocr_cls_model:
+                    missing.append("PP-LCNet_x1_0_doc_ori-ONNX")
+                error_msg = f"模型下载失败，无法获取：{', '.join(missing)}"
+                return JSONResponse(status_code=500, content={"error": error_msg})
+            
+            return {"message": "所有模型文件下载完成", "downloaded": True}
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": f"模型下载过程中出错：{str(e)}"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to download models: {str(e)}"})
 
 
 @router.post("/unload")
@@ -578,12 +613,17 @@ async def model_status():
         # 检查模型文件是否存在
         from pathlib import Path
         models_dir = Path(get_work_dir())
-        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX" / "inference.onnx"
-        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX" / "inference.onnx"
-        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX" / "inference.onnx"
-        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX" / "inference.onnx"
+        # 注意：模型路径应该是目录路径，不需要加 /inference.onnx
+        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX"
+        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
+        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
+        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
 
-        models_exist = all([layout_model_path.exists(), ocr_det_model.exists(), ocr_rec_model.exists(), ocr_cls_model.exists()])
+        # 检查模型目录内是否存在 inference.onnx 文件
+        models_exist = all([(layout_model_path / "inference.onnx").exists(), 
+                           (ocr_det_model / "inference.onnx").exists(), 
+                           (ocr_rec_model / "inference.onnx").exists(), 
+                           (ocr_cls_model / "inference.onnx").exists()])
 
         if not models_exist:
             return {

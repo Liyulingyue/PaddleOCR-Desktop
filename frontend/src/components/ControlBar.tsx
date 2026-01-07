@@ -25,6 +25,8 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const [modelExpanded, setModelExpanded] = useState(false)
   const [modelLoaded, setModelLoaded] = useState<boolean | null>(null)
   const [modelActionLoading, setModelActionLoading] = useState(false)
+  const [checkingModels, setCheckingModels] = useState(false)
+  const [checkStatus, setCheckStatus] = useState<string | null>(null)
 
   const showMsg = (m: string) => {
     if (onMessage) onMessage(m)
@@ -122,6 +124,45 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
     }
   }
 
+  const handleCheckAndDownloadModels = async () => {
+    setCheckingModels(true)
+    setCheckStatus(null)
+    try {
+      const apiPrefix = getApiPrefix()
+      
+      // 首先检查模型状态
+      const statusRes = await fetch(`${apiBaseUrl}${apiPrefix}/model_status`)
+      if (statusRes.ok) {
+        const statusData = await statusRes.json()
+        if (statusData.loaded) {
+          setCheckStatus('✅ 所有模型文件已完整')
+          setTimeout(() => setCheckStatus(null), 3000)
+          return
+        }
+      }
+
+      // 如果模型未加载，调用下载接口（只下载，不加载到内存）
+      setCheckStatus('⏳ 正在下载缺失模型...')
+      const downloadRes = await fetch(`${apiBaseUrl}${apiPrefix}/download_missing`, {
+        method: 'POST'
+      })
+      
+      if (downloadRes.ok) {
+        await downloadRes.json()
+        setCheckStatus('✅ 模型下载完成！')
+        setTimeout(() => setCheckStatus(null), 3000)
+      } else {
+        const errorData = await downloadRes.json()
+        const errorMsg = errorData.error || '模型下载失败'
+        setCheckStatus(`❌ ${errorMsg}`)
+      }
+    } catch (error) {
+      setCheckStatus(`❌ 下载失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setCheckingModels(false)
+    }
+  }
+
   // 自动在组件挂载时预加载当前状态
   useEffect(() => {
     if (apiBaseUrl) {
@@ -150,7 +191,27 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           <button onClick={onShowApiModal} className="control-btn info-btn">
             📖 API文档
           </button>
+          <button 
+            onClick={handleCheckAndDownloadModels}
+            disabled={checkingModels}
+            className="control-btn info-btn"
+            style={{ marginLeft: '0.5rem' }}
+          >
+            {checkingModels ? '⏳ 下载中...' : '📥 下载缺失模型'}
+          </button>
         </div>
+        {checkStatus && (
+          <div className="check-status" style={{ 
+            marginTop: '0.5rem', 
+            padding: '0.5rem',
+            borderRadius: '4px',
+            fontSize: '0.85rem',
+            backgroundColor: checkStatus.includes('✅') ? '#d4edda' : checkStatus.includes('❌') ? '#f8d7da' : '#e2e3e5',
+            color: checkStatus.includes('✅') ? '#155724' : checkStatus.includes('❌') ? '#721c24' : '#383d41'
+          }}>
+            {checkStatus}
+          </div>
+        )}
         {error && <span className="error">{error}</span>}
       </div>
 

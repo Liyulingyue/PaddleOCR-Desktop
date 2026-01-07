@@ -28,11 +28,17 @@ function FileUpload({ onFileSelect }: FileUploadProps) {
     e.preventDefault()
   }
 
+  const handleClick = () => {
+    const fileInput = document.getElementById('file-input') as HTMLInputElement
+    fileInput?.click()
+  }
+
   return (
     <div
       className="upload-area"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onClick={handleClick}
     >
       <input
         type="file"
@@ -41,7 +47,7 @@ function FileUpload({ onFileSelect }: FileUploadProps) {
         style={{ display: 'none' }}
         accept="image/*,.pdf"
       />
-      <label htmlFor="file-input" className="upload-label">
+      <label className="upload-label">
         点击或拖入文件上传
       </label>
       <p>支持图片、PDF 等格式</p>
