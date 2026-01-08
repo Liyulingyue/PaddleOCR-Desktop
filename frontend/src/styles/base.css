@@ -141,12 +141,32 @@ button:disabled {
   color: #777;
 }
 
-.config-description {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: #888;
-  font-style: italic;
+.config-item select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.config-item select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.config-item select:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.config-item select:disabled {
+  background: rgba(0, 0, 0, 0.05);
+  color: #999;
+  cursor: not-allowed;
 }
 
 .checkbox-label {

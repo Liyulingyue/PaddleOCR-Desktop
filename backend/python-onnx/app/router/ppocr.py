@@ -13,20 +13,26 @@ try:
 except ImportError:
     HAS_PIPELINE = False
 
-from ..config import get_work_dir
+from ..config import get_work_dir, get_pipeline_default_models, get_pipeline_model_options_by_name, get_model_path_from_registry
 
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
+_global_pipeline_models = None
 
 def get_global_pipeline():
     """获取全局pipeline实例"""
     global _global_pipeline
     return _global_pipeline
 
-def set_global_pipeline(pipeline):
+def set_global_pipeline(pipeline, models_key):
     """设置全局pipeline实例"""
-    global _global_pipeline
+    global _global_pipeline, _global_pipeline_models
     _global_pipeline = pipeline
+    _global_pipeline_models = models_key
+
+def get_pipeline_models_key(det_model, rec_model, cls_model):
+    """生成pipeline模型的唯一键"""
+    return f"{det_model}|{rec_model}|{cls_model}"
 
 try:
     import fitz  # pymupdf
@@ -87,7 +93,10 @@ async def recognize(
     cls_thresh: float = Form(0.9),
     use_cls: bool = Form(True),
     merge_overlaps: bool = Form(False),
-    overlap_threshold: float = Form(0.9)
+    overlap_threshold: float = Form(0.9),
+    det_model: str = Form(None),
+    rec_model: str = Form(None),
+    cls_model: str = Form(None)
 ):
     """
     使用PP-OCRv5 Pipeline进行OCR识别（返回pipeline格式）
@@ -107,11 +116,40 @@ async def recognize(
     filename = file.filename.lower() if file.filename else ""
 
     try:
+        # 处理默认模型配置
+        defaults = get_pipeline_default_models("ppocrv5")
+        
+        actual_det_model = det_model if det_model not in [None, "Default"] else defaults["ocr_det"]
+        actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
+        actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+        
         # 获取或创建pipeline实例
+        current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_cls_model)
         pipeline = get_global_pipeline()
-        if pipeline is None:
-            pipeline = PPOCRv5Pipeline(use_gpu=False)
-            set_global_pipeline(pipeline)
+        
+        if pipeline is None or _global_pipeline_models != current_models_key:
+            # 获取或创建pipeline实例时再次获取默认值（以防万一）
+            defaults = get_pipeline_default_models("ppocrv5")
+            
+            actual_det_model = det_model if det_model not in [None, "Default"] else defaults["ocr_det"]
+            actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
+            actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+            
+            # 根据选择的模型获取路径
+            det_model_path = get_model_path_from_registry(actual_det_model)
+            rec_model_path = get_model_path_from_registry(actual_rec_model)
+            cls_model_path = get_model_path_from_registry(actual_cls_model)
+            
+            if not all([det_model_path, rec_model_path, cls_model_path]):
+                return JSONResponse(status_code=400, content={"error": f"模型文件缺失: det={det_model_path}, rec={rec_model_path}, cls={cls_model_path}"})
+            
+            pipeline = PPOCRv5Pipeline(
+                det_model_path=det_model_path,
+                rec_model_path=rec_model_path,
+                cls_model_path=cls_model_path,
+                use_gpu=False
+            )
+            set_global_pipeline(pipeline, current_models_key)
 
         # 检查是否为PDF文件
         if filename.endswith('.pdf'):
@@ -439,8 +477,6 @@ async def load_model():
 async def download_missing_models():
     """下载缺失的OCR模型（仅下载，不加载到内存）"""
     try:
-        from ..config import get_model_path_from_registry
-        
         # 尝试获取所有模型路径，如果缺失会自动下载
         try:
             det_model = get_model_path_from_registry("PP-OCRv5_mobile_det-ONNX")
@@ -541,3 +577,19 @@ async def model_status():
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Failed to get model status: {str(e)}"})
+
+
+@router.get("/options")
+async def get_ocrv5_model_options_api():
+    """
+    获取OCRv5可用的模型选项
+    """
+    try:
+        options = get_pipeline_model_options_by_name("ppocrv5")
+        defaults = get_pipeline_default_models("ppocrv5")
+        return {
+            "options": options,
+            "defaults": defaults
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to get OCRv5 model options: {str(e)}"})

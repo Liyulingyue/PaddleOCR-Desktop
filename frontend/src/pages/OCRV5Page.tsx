@@ -18,7 +18,10 @@ function OCRV5Page() {
     clsThresh: 0.9,
     useCls: true,
     mergeOverlaps: false,
-    overlapThreshold: 0.9
+    overlapThreshold: 0.9,
+    detModel: 'Default',
+    recModel: 'Default',
+    clsModel: 'Default'
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -33,6 +36,22 @@ function OCRV5Page() {
       try {
         const url = await getCachedApiBaseUrl()
         setApiBaseUrl(url)
+        
+        // 获取默认模型配置
+        try {
+          const modelOptionsResponse = await fetch(`${url}/api/ocr/options`)
+          if (modelOptionsResponse.ok) {
+            const modelData = await modelOptionsResponse.json()
+            setConfig(prevConfig => ({
+              ...prevConfig,
+              detModel: modelData.defaults.det,
+              recModel: modelData.defaults.rec,
+              clsModel: modelData.defaults.cls
+            }))
+          }
+        } catch (modelError) {
+          console.error('Failed to get default model config:', modelError)
+        }
       } catch (error) {
         console.error('Failed to get API URL:', error)
       }
@@ -80,6 +99,9 @@ function OCRV5Page() {
     useCls: boolean
     mergeOverlaps: boolean
     overlapThreshold: number
+    detModel: string
+    recModel: string
+    clsModel: string
   }) => {
     setConfig(newConfig)
   }
@@ -107,6 +129,17 @@ function OCRV5Page() {
       formData.append('use_cls', config.useCls.toString())
       formData.append('merge_overlaps', config.mergeOverlaps.toString())
       formData.append('overlap_threshold', config.overlapThreshold.toString())
+      
+      // 只在非默认值时发送模型参数
+      if (config.detModel !== 'Default') {
+        formData.append('det_model', config.detModel)
+      }
+      if (config.recModel !== 'Default') {
+        formData.append('rec_model', config.recModel)
+      }
+      if (config.clsModel !== 'Default') {
+        formData.append('cls_model', config.clsModel)
+      }
 
       // Fetch OCR result
       const response = await fetch(`${apiBaseUrl}/api/ocr`, {

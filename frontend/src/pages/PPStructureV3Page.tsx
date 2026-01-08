@@ -24,7 +24,11 @@ function PPStructureV3Page() {
     mergeLayout: false,
     layoutOverlapThreshold: 0.9,
     useCls: true,
-    clsThresh: 0.9
+    clsThresh: 0.9,
+    layoutModel: 'Default',
+    ocrDetModel: 'Default',
+    ocrRecModel: 'Default',
+    clsModel: 'Default'
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -68,6 +72,23 @@ function PPStructureV3Page() {
       try {
         const url = await getCachedApiBaseUrl()
         setApiBaseUrl(url)
+        
+        // 获取默认模型配置
+        try {
+          const modelOptionsResponse = await fetch(`${url}/api/ppstructure/options`)
+          if (modelOptionsResponse.ok) {
+            const modelData = await modelOptionsResponse.json()
+            setConfig(prevConfig => ({
+              ...prevConfig,
+              layoutModel: modelData.defaults.layout_det,
+              ocrDetModel: modelData.defaults.ocr_det,
+              ocrRecModel: modelData.defaults.ocr_rec,
+              clsModel: modelData.defaults.doc_cls
+            }))
+          }
+        } catch (modelError) {
+          console.error('Failed to get default model config:', modelError)
+        }
       } catch (error) {
         console.error('Failed to get API URL:', error)
       }
@@ -81,7 +102,7 @@ function PPStructureV3Page() {
     setDrawnImage(null)
   }
 
-  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number }) => {
+  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number; layoutModel: string; ocrDetModel: string; ocrRecModel: string; clsModel: string }) => {
     setConfig(newConfig)
   }
 
@@ -109,6 +130,20 @@ function PPStructureV3Page() {
     formData.append('layout_overlap_threshold', config.layoutOverlapThreshold.toString())
     formData.append('use_cls', config.useCls.toString())
     formData.append('cls_thresh', config.clsThresh.toString())
+    
+    // 只在非默认值时发送模型参数
+    if (config.layoutModel !== 'Default') {
+      formData.append('layout_model', config.layoutModel)
+    }
+    if (config.ocrDetModel !== 'Default') {
+      formData.append('ocr_det_model', config.ocrDetModel)
+    }
+    if (config.ocrRecModel !== 'Default') {
+      formData.append('ocr_rec_model', config.ocrRecModel)
+    }
+    if (config.clsModel !== 'Default') {
+      formData.append('cls_model', config.clsModel)
+    }
 
     try {
       // Fetch layout detection result

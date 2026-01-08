@@ -17,7 +17,7 @@ import os
 import sys
 from pathlib import Path
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 def _resolve_base_dir() -> str:
     # Prefer the executable directory when bundled (PyInstaller, etc.)
@@ -55,54 +55,78 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
     "PP-DocLayout-L-ONNX": {
         "modelscope_id": "Liyulingyue/PP-DocLayout-L-ONNX",
         "local_path": "models/PP-DocLayout-L-ONNX",
+        "label": "PP-DocLayout L (标准精度)",
+        "description": "标准精度的文档布局检测模型"
     },
     "PP-DocLayout-M-ONNX": {
         "modelscope_id": "Liyulingyue/PP-DocLayout-M-ONNX",
         "local_path": "models/PP-DocLayout-M-ONNX",
+        "label": "PP-DocLayout M (中等精度)",
+        "description": "中等精度的文档布局检测模型"
     },
     "PP-DocLayout-S-ONNX": {
         "modelscope_id": "Liyulingyue/PP-DocLayout-S-ONNX",
         "local_path": "models/PP-DocLayout-S-ONNX",
+        "label": "PP-DocLayout S (轻量级)",
+        "description": "轻量级的文档布局检测模型，适合移动端"
     },
     "PP-DocLayout_plus-L-ONNX": {
         "modelscope_id": "Liyulingyue/PP-DocLayout_plus-L-ONNX",
         "local_path": "models/PP-DocLayout_plus-L-ONNX",
+        "label": "PP-DocLayout Plus L (增强版)",
+        "description": "增强版的文档布局检测模型"
     },
 
     # PP-OCRv5 系列（移动/服务器版本）
     "PP-OCRv5_mobile_det-ONNX": {
         "modelscope_id": "Liyulingyue/PP-OCRv5_mobile_det-ONNX",
         "local_path": "models/PP-OCRv5_mobile_det-ONNX",
+        "label": "PP-OCRv5 Mobile 检测 (轻量级)",
+        "description": "轻量级文本检测模型，适合移动端和一般场景"
     },
     "PP-OCRv5_mobile_rec-ONNX": {
         "modelscope_id": "Liyulingyue/PP-OCRv5_mobile_rec-ONNX",
         "local_path": "models/PP-OCRv5_mobile_rec-ONNX",
+        "label": "PP-OCRv5 Mobile 识别 (轻量级)",
+        "description": "轻量级文本识别模型，适合移动端和一般场景"
     },
     "PP-OCRv5_server_det-ONNX": {
         "modelscope_id": "Liyulingyue/PP-OCRv5_server_det-ONNX",
         "local_path": "models/PP-OCRv5_server_det-ONNX",
+        "label": "PP-OCRv5 Server 检测 (高精度)",
+        "description": "高精度文本检测模型，适合服务器端和复杂场景"
     },
     "PP-OCRv5_server_rec-ONNX": {
         "modelscope_id": "Liyulingyue/PP-OCRv5_server_rec-ONNX",
         "local_path": "models/PP-OCRv5_server_rec-ONNX",
+        "label": "PP-OCRv5 Server 识别 (高精度)",
+        "description": "高精度文本识别模型，适合服务器端和复杂场景"
     },
 
     "PP-LCNet_x1_0_textline_ori-ONNX": {
         "modelscope_id": "Liyulingyue/PP-LCNet_x1_0_textline_ori-ONNX",
         "local_path": "models/PP-LCNet_x1_0_textline_ori-ONNX",
+        "label": "PP-LCNet x1.0 文本行方向检测",
+        "description": "标准尺寸的方向检测模型，适合文本行场景"
     },
     "PP-LCNet_x0_25_textline_ori-ONNX": {
         "modelscope_id": "Liyulingyue/PP-LCNet_x0_25_textline_ori-ONNX",
         "local_path": "models/PP-LCNet_x0_25_textline_ori-ONNX",
+        "label": "PP-LCNet x0.25 文本行方向检测 (轻量级)",
+        "description": "轻量级方向检测模型，适合文本行场景"
     },
     "PP-LCNet_x1_0_doc_ori-ONNX": {
         "modelscope_id": "Liyulingyue/PP-LCNet_x1_0_doc_ori-ONNX",
         "local_path": "models/PP-LCNet_x1_0_doc_ori-ONNX",
+        "label": "PP-LCNet x1.0 文档方向检测",
+        "description": "标准尺寸的方向检测模型，适合文档场景"
     },
 
     "UVDoc-ONNX": {
         "modelscope_id": "Liyulingyue/UVDoc-ONNX",
         "local_path": "models/UVDoc-ONNX",
+        "label": "UVDoc 文档处理",
+        "description": "UV文档处理模型"
     },
 }
 
@@ -114,6 +138,12 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
         },
+        "options": {
+            "layout_det": ["PP-DocLayout-L-ONNX", "PP-DocLayout-M-ONNX", "PP-DocLayout-S-ONNX", "PP-DocLayout_plus-L-ONNX"],
+            "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
+            "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
+            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"]
+        }
     },
     "ppocrv5": {
         "models": {
@@ -121,6 +151,11 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
         },
+        "options": {
+            "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
+            "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
+            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"]
+        }
     }
 }
 
@@ -489,3 +524,73 @@ def print_all_models_status() -> None:
             print(f"✗ {model_name}: Not available")
 
     print(f"\nTotal: {available_count}/{total_count} models available")
+
+# =============================================================================
+# OCRv5 模型选项配置（已合并到PIPELINE_CONFIG中）
+# =============================================================================
+
+def get_pipeline_model_options(pipeline_name: str) -> Dict[str, List[Dict[str, str]]]:
+    """
+    获取pipeline的模型选项
+
+    Args:
+        pipeline_name: pipeline名称
+
+    Returns:
+        包含各组件的模型选项字典
+    """
+    if pipeline_name not in PIPELINE_CONFIG:
+        return {}
+    
+    pipeline_config = PIPELINE_CONFIG[pipeline_name]
+    options = pipeline_config.get("options", {})
+    
+    # 转换格式
+    result = {}
+    for component, model_list in options.items():
+        result[component] = []
+        for model_name in model_list:
+            # 从MODEL_REGISTRY获取模型信息
+            if model_name in MODEL_REGISTRY:
+                model_config = MODEL_REGISTRY[model_name]
+                result[component].append({
+                    "value": model_name,
+                    "label": model_config.get("label", model_name),
+                    "description": model_config.get("description", f"使用{model_name}模型")
+                })
+            else:
+                # 如果模型不在注册表中，使用默认值
+                result[component].append({
+                    "value": model_name,
+                    "label": model_name,
+                    "description": f"使用{model_name}模型"
+                })
+    
+    return result
+
+def get_pipeline_model_options_by_name(pipeline_name: str) -> Dict[str, List[Dict[str, str]]]:
+    """
+    根据pipeline名称获取模型选项
+
+    Args:
+        pipeline_name: pipeline名称，如 'pp_structure_v3', 'ppocrv5'
+
+    Returns:
+        包含各组件的模型选项字典
+    """
+    return get_pipeline_model_options(pipeline_name)
+
+def get_pipeline_default_models(pipeline_name: str) -> Dict[str, str]:
+    """
+    根据pipeline名称获取默认模型配置
+
+    Args:
+        pipeline_name: pipeline名称，如 'pp_structure_v3', 'ppocrv5'
+
+    Returns:
+        默认模型配置字典
+    """
+    if pipeline_name not in PIPELINE_CONFIG:
+        return {}
+    
+    return PIPELINE_CONFIG[pipeline_name].get("models", {})

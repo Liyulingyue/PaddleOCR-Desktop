@@ -21,7 +21,7 @@ try:
 except ImportError:
     HAS_PIPELINE = False
 
-from ..config import get_work_dir
+from ..config import get_work_dir, get_pipeline_default_models, get_pipeline_model_options_by_name, get_model_path_from_registry
 
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
@@ -67,7 +67,11 @@ async def analyze_structure(
     merge_layout: bool = Form(False),
     layout_overlap_threshold: float = Form(0.9),
     use_cls: bool = Form(True),
-    cls_thresh: float = Form(0.9)
+    cls_thresh: float = Form(0.9),
+    layout_model: str = Form(None),
+    ocr_det_model: str = Form(None),
+    ocr_rec_model: str = Form(None),
+    cls_model: str = Form(None)
 ):
     """
     使用PP-StructureV3 Pipeline进行文档结构分析（返回layout格式）
@@ -94,6 +98,14 @@ async def analyze_structure(
         return JSONResponse(status_code=400, content={"error": "Only image files (PNG, JPG, JPEG, BMP, TIFF) and PDF files are supported"})
 
     try:
+        # 处理默认模型配置
+        defaults = get_pipeline_default_models("pp_structure_v3")
+        
+        actual_layout_model = layout_model if layout_model not in [None, "Default"] else defaults["layout_det"]
+        actual_ocr_det_model = ocr_det_model if ocr_det_model not in [None, "Default"] else defaults["ocr_det"]
+        actual_ocr_rec_model = ocr_rec_model if ocr_rec_model not in [None, "Default"] else defaults["ocr_rec"]
+        actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+        
         # 获取或创建pipeline实例
         pipeline = get_global_pipeline()
         if pipeline is None:
@@ -557,8 +569,6 @@ async def load_model():
 async def download_missing_models():
     """下载缺失的PP-StructureV3模型（仅下载，不加载到内存）"""
     try:
-        from ..config import get_model_path_from_registry
-        
         # 尝试获取所有模型路径，如果缺失会自动下载
         try:
             layout_model_path = get_model_path_from_registry("PP-DocLayout-L-ONNX")
@@ -664,3 +674,19 @@ async def model_status():
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Failed to get model status: {str(e)}"})
+
+
+@router.get("/options")
+async def get_ppstructure_model_options_api():
+    """
+    获取PP-StructureV3可用的模型选项
+    """
+    try:
+        options = get_pipeline_model_options_by_name("pp_structure_v3")
+        defaults = get_pipeline_default_models("pp_structure_v3")
+        return {
+            "options": options,
+            "defaults": defaults
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to get PP-StructureV3 model options: {str(e)}"})

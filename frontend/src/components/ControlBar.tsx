@@ -20,9 +20,19 @@ interface SidebarProps {
 function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, onShowErrorModal, pageType = 'ocr' }: SidebarProps) {
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [ppstructureOcrConfigExpanded, setPpstructureOcrConfigExpanded] = useState(false)
+  const [modelSelectionExpanded, setModelSelectionExpanded] = useState(false)
 
   // Model status panel
   const [modelExpanded, setModelExpanded] = useState(false)
+
+  // Model options from backend
+  const [modelOptions, setModelOptions] = useState<{
+    det: Array<{value: string, label: string, description: string}>,
+    rec: Array<{value: string, label: string, description: string}>,
+    cls: Array<{value: string, label: string, description: string}>,
+    layout?: Array<{value: string, label: string, description: string}>
+  } | null>(null)
+  const [loadingModelOptions, setLoadingModelOptions] = useState(false)
   const [modelLoaded, setModelLoaded] = useState<boolean | null>(null)
   const [modelActionLoading, setModelActionLoading] = useState(false)
   const [checkingModels, setCheckingModels] = useState(false)
@@ -170,6 +180,75 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBaseUrl])
+
+  // 获取模型选项
+  useEffect(() => {
+    const fetchModelOptions = async () => {
+      if (!apiBaseUrl) return
+
+      setLoadingModelOptions(true)
+      try {
+        let response;
+        if (pageType === 'ppstructure') {
+          response = await fetch(`${apiBaseUrl}/api/ppstructure/options`)
+        } else if (pageType === 'ocr') {
+          response = await fetch(`${apiBaseUrl}/api/ocr/options`)
+        } else {
+          return
+        }
+        
+        if (response.ok) {
+          const data = await response.json()
+          // 映射后端返回的组件名称到前端期望的名称
+          let mappedOptions;
+          if (pageType === 'ppstructure') {
+            mappedOptions = {
+              layout: data.options.layout_det || [],
+              det: data.options.ocr_det || [],
+              rec: data.options.ocr_rec || [],
+              cls: data.options.doc_cls || []
+            }
+          } else {
+            mappedOptions = {
+              det: data.options.ocr_det || [],
+              rec: data.options.ocr_rec || [],
+              cls: data.options.doc_cls || []
+            }
+          }
+          
+          // 添加"Default"选项到每个模型类型
+          const optionsWithDefault = {
+            ...mappedOptions,
+            layout: pageType === 'ppstructure' ? [
+              { value: 'Default', label: '默认模型', description: '使用系统默认的布局检测模型' },
+              ...mappedOptions.layout
+            ] : undefined,
+            det: [
+              { value: 'Default', label: '默认模型', description: '使用系统默认的检测模型' },
+              ...mappedOptions.det
+            ],
+            rec: [
+              { value: 'Default', label: '默认模型', description: '使用系统默认的识别模型' },
+              ...mappedOptions.rec
+            ],
+            cls: [
+              { value: 'Default', label: '默认模型', description: '使用系统默认的方向检测模型' },
+              ...mappedOptions.cls
+            ]
+          }
+          setModelOptions(optionsWithDefault)
+        } else {
+          console.error('Failed to fetch model options:', response.status)
+        }
+      } catch (error) {
+        console.error('Error fetching model options:', error)
+      } finally {
+        setLoadingModelOptions(false)
+      }
+    }
+
+    fetchModelOptions()
+  }, [apiBaseUrl, pageType])
 
   return (
     <aside className="control-bar">
@@ -435,6 +514,115 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           </div>
         )}
       </div>
+
+      {pageType === 'ocr' && (
+        <div className="control-section">
+          <div 
+            className="config-section-header"
+            onClick={() => setModelSelectionExpanded(!modelSelectionExpanded)}
+          >
+            <h4>模型选择</h4>
+            <span className={`expand-icon ${modelSelectionExpanded ? 'expanded' : ''}`}>▼</span>
+          </div>
+          {modelSelectionExpanded && (
+            <div className="config-content">
+              {loadingModelOptions ? (
+                <div className="config-item">
+                  <p>正在加载模型选项...</p>
+                </div>
+              ) : modelOptions ? (
+                <>
+                  {pageType === 'ppstructure' && modelOptions.layout && (
+                    <div className="config-item">
+                      <label htmlFor="layout-model">布局检测模型:</label>
+                      <select
+                        id="layout-model"
+                        value={config.layoutModel || modelOptions.layout[0]?.value}
+                        onChange={(e) => onConfigChange({ ...config, layoutModel: e.target.value })}
+                        disabled={loading}
+                        className="model-select"
+                      >
+                        {modelOptions.layout.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="config-description">
+                        {modelOptions.layout.find(opt => opt.value === (config.layoutModel || modelOptions.layout[0]?.value))?.description || '选择用于文档布局检测的模型'}
+                      </small>
+                    </div>
+                  )}
+
+                  <div className="config-item">
+                    <label htmlFor="det-model">{pageType === 'ppstructure' ? 'OCR检测模型:' : '检测模型:'}</label>
+                    <select
+                      id="det-model"
+                      value={config.detModel || modelOptions.det[0]?.value}
+                      onChange={(e) => onConfigChange({ ...config, detModel: e.target.value })}
+                      disabled={loading}
+                      className="model-select"
+                    >
+                      {modelOptions.det.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="config-description">
+                      {modelOptions.det.find(opt => opt.value === (config.detModel || modelOptions.det[0]?.value))?.description || '选择用于文本检测的模型'}
+                    </small>
+                  </div>
+
+                  <div className="config-item">
+                    <label htmlFor="rec-model">{pageType === 'ppstructure' ? 'OCR识别模型:' : '识别模型:'}</label>
+                    <select
+                      id="rec-model"
+                      value={config.recModel || modelOptions.rec[0]?.value}
+                      onChange={(e) => onConfigChange({ ...config, recModel: e.target.value })}
+                      disabled={loading}
+                      className="model-select"
+                    >
+                      {modelOptions.rec.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="config-description">
+                      {modelOptions.rec.find(opt => opt.value === (config.recModel || modelOptions.rec[0]?.value))?.description || '选择用于文本识别的模型'}
+                    </small>
+                  </div>
+
+                  <div className="config-item">
+                    <label htmlFor="cls-model">方向检测模型:</label>
+                    <select
+                      id="cls-model"
+                      value={config.clsModel || modelOptions.cls[0]?.value}
+                      onChange={(e) => onConfigChange({ ...config, clsModel: e.target.value })}
+                      disabled={loading}
+                      className="model-select"
+                    >
+                      {modelOptions.cls.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="config-description">
+                      {modelOptions.cls.find(opt => opt.value === (config.clsModel || modelOptions.cls[0]?.value))?.description || '选择用于文档方向检测的模型'}
+                    </small>
+                  </div>
+                </>
+              ) : (
+                <div className="config-item">
+                  <p>无法加载模型选项</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {pageType === 'ppstructure' && (
         <div className="control-section">
