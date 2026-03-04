@@ -130,16 +130,10 @@ function OCRV5Page() {
       formData.append('merge_overlaps', config.mergeOverlaps.toString())
       formData.append('overlap_threshold', config.overlapThreshold.toString())
       
-      // 只在非默认值时发送模型参数
-      if (config.detModel !== 'Default') {
-        formData.append('det_model', config.detModel)
-      }
-      if (config.recModel !== 'Default') {
-        formData.append('rec_model', config.recModel)
-      }
-      if (config.clsModel !== 'Default') {
-        formData.append('cls_model', config.clsModel)
-      }
+      // 总是发送模型参数（即使是默认值）
+      formData.append('det_model', config.detModel || 'Default')
+      formData.append('rec_model', config.recModel || 'Default')
+      formData.append('cls_model', config.clsModel || 'Default')
 
       // Fetch OCR result
       const response = await fetch(`${apiBaseUrl}/api/ocr`, {

@@ -134,7 +134,7 @@ async def recognize(
             actual_det_model = det_model if det_model not in [None, "Default"] else defaults["ocr_det"]
             actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
             actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
-            
+        
             # 根据选择的模型获取路径
             det_model_path = get_model_path_from_registry(actual_det_model)
             rec_model_path = get_model_path_from_registry(actual_rec_model)

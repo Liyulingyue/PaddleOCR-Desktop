@@ -131,19 +131,11 @@ function PPStructureV3Page() {
     formData.append('use_cls', config.useCls.toString())
     formData.append('cls_thresh', config.clsThresh.toString())
     
-    // 只在非默认值时发送模型参数
-    if (config.layoutModel !== 'Default') {
-      formData.append('layout_model', config.layoutModel)
-    }
-    if (config.ocrDetModel !== 'Default') {
-      formData.append('ocr_det_model', config.ocrDetModel)
-    }
-    if (config.ocrRecModel !== 'Default') {
-      formData.append('ocr_rec_model', config.ocrRecModel)
-    }
-    if (config.clsModel !== 'Default') {
-      formData.append('cls_model', config.clsModel)
-    }
+    // 总是发送模型参数（即使是默认值）
+    formData.append('layout_model', config.layoutModel || 'Default')
+    formData.append('ocr_det_model', config.ocrDetModel || 'Default')
+    formData.append('ocr_rec_model', config.ocrRecModel || 'Default')
+    formData.append('cls_model', config.clsModel || 'Default')
 
     try {
       // Fetch layout detection result
