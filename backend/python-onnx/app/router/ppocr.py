@@ -30,9 +30,9 @@ def set_global_pipeline(pipeline, models_key):
     _global_pipeline = pipeline
     _global_pipeline_models = models_key
 
-def get_pipeline_models_key(det_model, rec_model, cls_model):
+def get_pipeline_models_key(det_model, rec_model, doc_cls_model, textline_cls_model):
     """生成pipeline模型的唯一键"""
-    return f"{det_model}|{rec_model}|{cls_model}"
+    return f"{det_model}|{rec_model}|{doc_cls_model}|{textline_cls_model}"
 
 try:
     import fitz  # pymupdf
@@ -90,24 +90,33 @@ def pdf_to_images_from_bytes(pdf_bytes, dpi=200):
 async def recognize(
     file: UploadFile = File(...),
     det_db_thresh: float = Form(0.3),
-    cls_thresh: float = Form(0.9),
-    use_cls: bool = Form(True),
+    doc_cls_thresh: float = Form(0.9),
+    use_doc_cls: bool = Form(True),
+    textline_cls_thresh: float = Form(0.9),
+    use_textline_cls: bool = Form(True),
     merge_overlaps: bool = Form(False),
     overlap_threshold: float = Form(0.9),
     det_model: str = Form(None),
     rec_model: str = Form(None),
-    cls_model: str = Form(None)
+    doc_cls_model: str = Form(None),
+    textline_cls_model: str = Form(None)
 ):
     """
     使用PP-OCRv5 Pipeline进行OCR识别（返回pipeline格式）
 
     Args:
         file: 上传的图像文件或PDF文件
-        det_db_thresh: 检测阈值（保留参数以保持兼容性）
-        cls_thresh: 分类阈值（保留参数以保持兼容性）
-        use_cls: 是否使用分类（保留参数以保持兼容性）
+        det_db_thresh: 检测阈值
+        doc_cls_thresh: 文档方向分类阈值
+        use_doc_cls: 是否使用文档方向分类
+        textline_cls_thresh: 文本行方向分类阈值
+        use_textline_cls: 是否使用文本行方向分类
         merge_overlaps: 是否合并重叠的文本框
         overlap_threshold: 合并重叠框的重叠度阈值（交集/最小面积）
+        det_model: 检测模型名称
+        rec_model: 识别模型名称
+        doc_cls_model: 文档方向分类模型名称
+        textline_cls_model: 文本行方向分类模型名称
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用，请检查依赖"})
@@ -121,10 +130,11 @@ async def recognize(
         
         actual_det_model = det_model if det_model not in [None, "Default"] else defaults["ocr_det"]
         actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
-        actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+        actual_doc_cls_model = doc_cls_model if doc_cls_model not in [None, "Default"] else defaults["doc_cls"]
+        actual_textline_cls_model = textline_cls_model if textline_cls_model not in [None, "Default"] else defaults["textline_cls"]
         
         # 获取或创建pipeline实例
-        current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_cls_model)
+        current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_doc_cls_model, actual_textline_cls_model)
         pipeline = get_global_pipeline()
         
         if pipeline is None or _global_pipeline_models != current_models_key:
@@ -133,20 +143,23 @@ async def recognize(
             
             actual_det_model = det_model if det_model not in [None, "Default"] else defaults["ocr_det"]
             actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
-            actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+            actual_doc_cls_model = doc_cls_model if doc_cls_model not in [None, "Default"] else defaults["doc_cls"]
+            actual_textline_cls_model = textline_cls_model if textline_cls_model not in [None, "Default"] else defaults["textline_cls"]
         
             # 根据选择的模型获取路径
             det_model_path = get_model_path_from_registry(actual_det_model)
             rec_model_path = get_model_path_from_registry(actual_rec_model)
-            cls_model_path = get_model_path_from_registry(actual_cls_model)
+            doc_cls_model_path = get_model_path_from_registry(actual_doc_cls_model)
+            textline_cls_model_path = get_model_path_from_registry(actual_textline_cls_model)
             
-            if not all([det_model_path, rec_model_path, cls_model_path]):
-                return JSONResponse(status_code=400, content={"error": f"模型文件缺失: det={det_model_path}, rec={rec_model_path}, cls={cls_model_path}"})
+            if not all([det_model_path, rec_model_path, doc_cls_model_path, textline_cls_model_path]):
+                return JSONResponse(status_code=400, content={"error": f"模型文件缺失: det={det_model_path}, rec={rec_model_path}, doc_cls={doc_cls_model_path}, textline_cls={textline_cls_model_path}"})
             
             pipeline = PPOCRv5Pipeline(
                 det_model_path=det_model_path,
                 rec_model_path=rec_model_path,
-                cls_model_path=cls_model_path,
+                doc_cls_model_path=doc_cls_model_path,
+                textline_cls_model_path=textline_cls_model_path,
                 use_gpu=False
             )
             set_global_pipeline(pipeline, current_models_key)
@@ -166,19 +179,20 @@ async def recognize(
             for page_idx, img in enumerate(images):
                 try:
                     # 使用pipeline进行OCR
-                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
+                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
                     # 直接返回pipeline格式
                     formatted_results = []
                     for result in page_results:
-                        if result['confidence'] >= 0.1:  # 过滤低置信度结果
+                        if result['confidence'] >= 0.1:
                             formatted_result = {
                                 "box": result["bbox"],
                                 "text": result["text"],
                                 "text_confidence": float(result["confidence"]),
-                                "rotation": result["rotation"],
-                                "rotation_confidence": float(result["rotation_confidence"]),
-                                "text_direction": None  # 预留字段，用于将来添加文字方向信息
+                                "doc_rotation": result["doc_rotation"],
+                                "doc_rotation_confidence": float(result["doc_rotation_confidence"]),
+                                "textline_rotation": result["textline_rotation"],
+                                "textline_rotation_confidence": float(result["textline_rotation_confidence"])
                             }
                             formatted_results.append(formatted_result)
 
@@ -199,19 +213,19 @@ async def recognize(
             img = np.array(img)
 
             # 使用pipeline进行OCR
-            results = pipeline.ocr(img, conf_threshold=det_db_thresh, cls_thresh=cls_thresh, use_cls=use_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
+            results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
-            # 直接返回pipeline格式
             formatted_results = []
             for result in results:
-                if result['confidence'] >= 0.1:  # 过滤低置信度结果
+                if result['confidence'] >= 0.1:
                     formatted_result = {
                         "box": result["bbox"],
                         "text": result["text"],
                         "text_confidence": float(result["confidence"]),
-                        "rotation": result["rotation"],
-                        "rotation_confidence": float(result["rotation_confidence"]),
-                        "text_direction": None  # 预留字段，用于将来添加文字方向信息
+                        "doc_rotation": result["doc_rotation"],
+                        "doc_rotation_confidence": float(result["doc_rotation_confidence"]),
+                        "textline_rotation": result["textline_rotation"],
+                        "textline_rotation_confidence": float(result["textline_rotation_confidence"])
                     }
                     formatted_results.append(formatted_result)
 
@@ -285,9 +299,9 @@ async def draw_ocr_result(
                     scores = []
 
                     # 提取该页的全局rotation角度
-                    page_rotation = 0
+                    page_doc_rotation = 0
                     if page_result and len(page_result) > 0 and isinstance(page_result[0], dict):
-                        page_rotation = page_result[0].get("rotation", 0)
+                        page_doc_rotation = page_result[0].get("doc_rotation", 0)
 
                     for result in page_result:
                         if isinstance(result, dict) and "box" in result and "text" in result:
@@ -297,8 +311,7 @@ async def draw_ocr_result(
                                 scores.append(result.get("text_confidence", 0))
 
                     if boxes:
-                        # 根据页面的rotation角度旋转图像
-                        rotated_img = rotate_image(img, page_rotation)
+                        rotated_img = rotate_image(img, page_doc_rotation)
                         
                         # 在旋转后的图像上绘制OCR结果（只绘制边界框，不显示文字）
                         drawn_img = draw_ocr(rotated_img, boxes, txts=None, scores=None, drop_score=drop_score)
@@ -345,9 +358,9 @@ async def draw_ocr_result(
                 results = ocr_data["results"]
 
                 # 提取全局rotation角度
-                global_rotation = 0
+                global_doc_rotation = 0
                 if results and len(results) > 0 and isinstance(results[0], dict):
-                    global_rotation = results[0].get("rotation", 0)
+                    global_doc_rotation = results[0].get("doc_rotation", 0)
 
                 # 转换为draw_ocr期望的格式
                 boxes = []
@@ -363,7 +376,7 @@ async def draw_ocr_result(
 
                 if boxes:
                     # 根据全局rotation角度旋转图像
-                    rotated_img = rotate_image(img_np, global_rotation)
+                    rotated_img = rotate_image(img_np, global_doc_rotation)
                     
                     # 在旋转后的图像上绘制OCR结果（只绘制边界框，不显示文字）
                     drawn_img = draw_ocr(rotated_img, boxes, txts=None, scores=None, drop_score=drop_score)
@@ -437,16 +450,18 @@ async def load_model():
         # 注意：模型路径应该是目录路径，模型类会自动在内部拼接 /inference.onnx
         det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
         rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
-        cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        doc_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
 
-        # 检查模型目录内是否存在 inference.onnx 文件
         missing_files = []
         if not (det_model / "inference.onnx").exists():
             missing_files.append("PP-OCRv5_mobile_det-ONNX/inference.onnx")
         if not (rec_model / "inference.onnx").exists():
             missing_files.append("PP-OCRv5_mobile_rec-ONNX/inference.onnx")
-        if not (cls_model / "inference.onnx").exists():
+        if not (doc_cls_model / "inference.onnx").exists():
             missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
+        if not (textline_cls_model / "inference.onnx").exists():
+            missing_files.append("PP-LCNet_x1_0_textline_ori-ONNX/inference.onnx")
 
         if missing_files:
             error_msg = f"模型文件不完整，缺少以下文件：\n" + "\n".join(f"  - {file}" for file in missing_files)
@@ -458,10 +473,11 @@ async def load_model():
             pipeline = PPOCRv5Pipeline(
                 det_model_path=str(det_model),
                 rec_model_path=str(rec_model),
-                cls_model_path=str(cls_model),
+                doc_cls_model_path=str(doc_cls_model),
+                textline_cls_model_path=str(textline_cls_model),
                 use_gpu=False
             )
-            set_global_pipeline(pipeline)
+            set_global_pipeline(pipeline, "default")
 
         # 加载模型
         if pipeline.load():
@@ -481,16 +497,19 @@ async def download_missing_models():
         try:
             det_model = get_model_path_from_registry("PP-OCRv5_mobile_det-ONNX")
             rec_model = get_model_path_from_registry("PP-OCRv5_mobile_rec-ONNX")
-            cls_model = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
+            doc_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
+            textline_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_textline_ori-ONNX")
             
-            if not all([det_model, rec_model, cls_model]):
+            if not all([det_model, rec_model, doc_cls_model, textline_cls_model]):
                 missing = []
                 if not det_model:
                     missing.append("PP-OCRv5_mobile_det-ONNX")
                 if not rec_model:
                     missing.append("PP-OCRv5_mobile_rec-ONNX")
-                if not cls_model:
+                if not doc_cls_model:
                     missing.append("PP-LCNet_x1_0_doc_ori-ONNX")
+                if not textline_cls_model:
+                    missing.append("PP-LCNet_x1_0_textline_ori-ONNX")
                 error_msg = f"模型下载失败，无法获取：{', '.join(missing)}"
                 return JSONResponse(status_code=500, content={"error": error_msg})
             
@@ -531,12 +550,13 @@ async def model_status():
         # 注意：模型路径应该是目录路径，不需要加 /inference.onnx
         det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
         rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
-        cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        doc_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
 
-        # 检查模型目录内是否存在 inference.onnx 文件
         models_exist = all([(det_model / "inference.onnx").exists(), 
                            (rec_model / "inference.onnx").exists(), 
-                           (cls_model / "inference.onnx").exists()])
+                           (doc_cls_model / "inference.onnx").exists(),
+                           (textline_cls_model / "inference.onnx").exists()])
 
         if not models_exist:
             return {

@@ -54,3 +54,5 @@ src-tauri/target/
 
 # Frontend binaries
 frontend/src-tauri/binaries/
+
+reference/

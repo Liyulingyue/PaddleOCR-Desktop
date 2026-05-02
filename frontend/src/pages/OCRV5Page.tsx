@@ -17,11 +17,14 @@ function OCRV5Page() {
     detThresh: 0.3,
     clsThresh: 0.9,
     useCls: true,
+    textlineClsThresh: 0.9,
+    useTextlineCls: false,
     mergeOverlaps: false,
     overlapThreshold: 0.9,
     detModel: 'Default',
     recModel: 'Default',
-    clsModel: 'Default'
+    clsModel: 'Default',
+    textlineClsModel: 'Default'
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -44,9 +47,10 @@ function OCRV5Page() {
             const modelData = await modelOptionsResponse.json()
             setConfig(prevConfig => ({
               ...prevConfig,
-              detModel: modelData.defaults.det,
-              recModel: modelData.defaults.rec,
-              clsModel: modelData.defaults.cls
+              detModel: modelData.defaults.ocr_det,
+              recModel: modelData.defaults.ocr_rec,
+              clsModel: modelData.defaults.doc_cls,
+              textlineClsModel: modelData.defaults.textline_cls
             }))
           }
         } catch (modelError) {
@@ -97,11 +101,14 @@ function OCRV5Page() {
     detThresh: number
     clsThresh: number
     useCls: boolean
+    textlineClsThresh: number
+    useTextlineCls: boolean
     mergeOverlaps: boolean
     overlapThreshold: number
     detModel: string
     recModel: string
     clsModel: string
+    textlineClsModel: string
   }) => {
     setConfig(newConfig)
   }
@@ -125,15 +132,18 @@ function OCRV5Page() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('det_db_thresh', config.detThresh.toString())
-      formData.append('cls_thresh', config.clsThresh.toString())
-      formData.append('use_cls', config.useCls.toString())
+      formData.append('doc_cls_thresh', config.clsThresh.toString())
+      formData.append('use_doc_cls', config.useCls.toString())
+      formData.append('textline_cls_thresh', config.textlineClsThresh.toString())
+      formData.append('use_textline_cls', config.useTextlineCls.toString())
       formData.append('merge_overlaps', config.mergeOverlaps.toString())
       formData.append('overlap_threshold', config.overlapThreshold.toString())
       
       // 总是发送模型参数（即使是默认值）
       formData.append('det_model', config.detModel || 'Default')
       formData.append('rec_model', config.recModel || 'Default')
-      formData.append('cls_model', config.clsModel || 'Default')
+      formData.append('doc_cls_model', config.clsModel || 'Default')
+      formData.append('textline_cls_model', config.textlineClsModel || 'Default')
 
       // Fetch OCR result
       const response = await fetch(`${apiBaseUrl}/api/ocr`, {

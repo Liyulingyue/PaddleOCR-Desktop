@@ -30,6 +30,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
     det: Array<{value: string, label: string, description: string}>,
     rec: Array<{value: string, label: string, description: string}>,
     cls: Array<{value: string, label: string, description: string}>,
+    textlineCls?: Array<{value: string, label: string, description: string}>,
     layout?: Array<{value: string, label: string, description: string}>
   } | null>(null)
   const [loadingModelOptions, setLoadingModelOptions] = useState(false)
@@ -206,13 +207,15 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
               layout: data.options.layout_det || [],
               det: data.options.ocr_det || [],
               rec: data.options.ocr_rec || [],
-              cls: data.options.doc_cls || []
+              cls: data.options.doc_cls || [],
+              textlineCls: data.options.textline_cls || []
             }
           } else {
             mappedOptions = {
               det: data.options.ocr_det || [],
               rec: data.options.ocr_rec || [],
-              cls: data.options.doc_cls || []
+              cls: data.options.doc_cls || [],
+              textlineCls: data.options.textline_cls || []
             }
           }
           
@@ -234,7 +237,11 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
             cls: [
               { value: 'Default', label: '默认模型', description: '使用系统默认的方向检测模型' },
               ...mappedOptions.cls
-            ]
+            ],
+            textlineCls: mappedOptions.textlineCls ? [
+              { value: 'Default', label: '默认模型', description: '使用系统默认的文本行方向检测模型' },
+              ...mappedOptions.textlineCls
+            ] : undefined
           }
           setModelOptions(optionsWithDefault)
         } else {
@@ -375,7 +382,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                 </div>
 
                 <div className="config-item">
-                  <label htmlFor="cls-threshold">方向检测阈值: {config.clsThresh}</label>
+                  <label htmlFor="cls-threshold">文档方向阈值: {config.clsThresh}</label>
                   <input
                     id="cls-threshold"
                     type="range"
@@ -390,7 +397,39 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                     <span>0.0</span>
                     <span>1.0</span>
                   </div>
-                  <small className="config-description">控制方向检测的置信度阈值，低于此值将跳过旋转</small>
+                  <small className="config-description">控制文档方向检测的置信度阈值</small>
+                </div>
+
+                <div className="config-item">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.useTextlineCls}
+                      onChange={(e) => onConfigChange({ ...config, useTextlineCls: e.target.checked })}
+                      disabled={loading}
+                    />
+                    启用文本行方向检测
+                  </label>
+                  <small className="config-description">检测单个文本行是否倒置(180度)，自动翻转后再识别</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="textline-cls-thresh-pp">文本行方向阈值: {config.textlineClsThresh}</label>
+                  <input
+                    id="textline-cls-thresh-pp"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.textlineClsThresh}
+                    onChange={(e) => onConfigChange({ ...config, textlineClsThresh: parseFloat(e.target.value) })}
+                    disabled={loading || !config.useTextlineCls}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制文本行方向检测的置信度阈值</small>
                 </div>
 
                 <div className="config-item">
@@ -460,7 +499,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                 </div>
 
                 <div className="config-item">
-                  <label htmlFor="cls-thresh">分类阈值: {config.clsThresh}</label>
+                  <label htmlFor="cls-thresh">文档方向阈值: {config.clsThresh}</label>
                   <input
                     id="cls-thresh"
                     type="range"
@@ -475,7 +514,39 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                     <span>0.0</span>
                     <span>1.0</span>
                   </div>
-                  <small className="config-description">控制文本方向分类的置信度阈值</small>
+                  <small className="config-description">控制文档方向分类的置信度阈值</small>
+                </div>
+
+                <div className="config-item">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={config.useTextlineCls}
+                      onChange={(e) => onConfigChange({ ...config, useTextlineCls: e.target.checked })}
+                      disabled={loading}
+                    />
+                    启用文本行方向检测
+                  </label>
+                  <small className="config-description">检测单个文本行是否倒置(180度)，自动翻转后再识别</small>
+                </div>
+
+                <div className="config-item">
+                  <label htmlFor="textline-cls-thresh">文本行方向阈值: {config.textlineClsThresh}</label>
+                  <input
+                    id="textline-cls-thresh"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.textlineClsThresh}
+                    onChange={(e) => onConfigChange({ ...config, textlineClsThresh: parseFloat(e.target.value) })}
+                    disabled={loading || !config.useTextlineCls}
+                  />
+                  <div className="range-labels">
+                    <span>0.0</span>
+                    <span>1.0</span>
+                  </div>
+                  <small className="config-description">控制文本行方向检测的置信度阈值</small>
                 </div>
 
                 <div className="config-item">
@@ -595,7 +666,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                   </div>
 
                   <div className="config-item">
-                    <label htmlFor="cls-model">方向检测模型:</label>
+                    <label htmlFor="cls-model">文档方向模型:</label>
                     <select
                       id="cls-model"
                       value={config.clsModel || modelOptions.cls[0]?.value}
@@ -613,6 +684,28 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                       {modelOptions.cls.find(opt => opt.value === (config.clsModel || modelOptions.cls[0]?.value))?.description || '选择用于文档方向检测的模型'}
                     </small>
                   </div>
+
+                  {modelOptions.textlineCls && (
+                  <div className="config-item">
+                    <label htmlFor="textline-cls-model">文本行方向模型:</label>
+                    <select
+                      id="textline-cls-model"
+                      value={config.textlineClsModel || modelOptions.textlineCls[0]?.value}
+                      onChange={(e) => onConfigChange({ ...config, textlineClsModel: e.target.value })}
+                      disabled={loading}
+                      className="model-select"
+                    >
+                      {modelOptions.textlineCls.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="config-description">
+                      {modelOptions.textlineCls.find(opt => opt.value === (config.textlineClsModel || modelOptions.textlineCls[0]?.value))?.description || '选择用于文本行方向检测的模型'}
+                    </small>
+                  </div>
+                  )}
                 </>
               ) : (
                 <div className="config-item">

@@ -25,10 +25,13 @@ function PPStructureV3Page() {
     layoutOverlapThreshold: 0.9,
     useCls: true,
     clsThresh: 0.9,
+    useTextlineCls: false,
+    textlineClsThresh: 0.9,
     layoutModel: 'Default',
     ocrDetModel: 'Default',
     ocrRecModel: 'Default',
-    clsModel: 'Default'
+    clsModel: 'Default',
+    textlineClsModel: 'Default'
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -83,7 +86,8 @@ function PPStructureV3Page() {
               layoutModel: modelData.defaults.layout_det,
               ocrDetModel: modelData.defaults.ocr_det,
               ocrRecModel: modelData.defaults.ocr_rec,
-              clsModel: modelData.defaults.doc_cls
+              clsModel: modelData.defaults.doc_cls,
+              textlineClsModel: modelData.defaults.textline_cls
             }))
           }
         } catch (modelError) {
@@ -102,7 +106,7 @@ function PPStructureV3Page() {
     setDrawnImage(null)
   }
 
-  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number; layoutModel: string; ocrDetModel: string; ocrRecModel: string; clsModel: string }) => {
+  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number; useTextlineCls: boolean; textlineClsThresh: number; layoutModel: string; ocrDetModel: string; ocrRecModel: string; clsModel: string; textlineClsModel: string }) => {
     setConfig(newConfig)
   }
 
@@ -130,12 +134,15 @@ function PPStructureV3Page() {
     formData.append('layout_overlap_threshold', config.layoutOverlapThreshold.toString())
     formData.append('use_cls', config.useCls.toString())
     formData.append('cls_thresh', config.clsThresh.toString())
+    formData.append('use_textline_cls', config.useTextlineCls.toString())
+    formData.append('textline_cls_thresh', config.textlineClsThresh.toString())
     
     // 总是发送模型参数（即使是默认值）
     formData.append('layout_model', config.layoutModel || 'Default')
     formData.append('ocr_det_model', config.ocrDetModel || 'Default')
     formData.append('ocr_rec_model', config.ocrRecModel || 'Default')
     formData.append('cls_model', config.clsModel || 'Default')
+    formData.append('textline_cls_model', config.textlineClsModel || 'Default')
 
     try {
       // Fetch layout detection result

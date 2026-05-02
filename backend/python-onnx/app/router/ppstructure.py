@@ -68,10 +68,13 @@ async def analyze_structure(
     layout_overlap_threshold: float = Form(0.9),
     use_cls: bool = Form(True),
     cls_thresh: float = Form(0.9),
+    use_textline_cls: bool = Form(False),
+    textline_cls_thresh: float = Form(0.9),
     layout_model: str = Form(None),
     ocr_det_model: str = Form(None),
     ocr_rec_model: str = Form(None),
-    cls_model: str = Form(None)
+    cls_model: str = Form(None),
+    textline_cls_model: str = Form(None)
 ):
     """
     使用PP-StructureV3 Pipeline进行文档结构分析（返回layout格式）
@@ -82,10 +85,13 @@ async def analyze_structure(
         ocr_det_db_thresh: OCR检测阈值（用于OCR文本识别）
         unclip_ratio: 裁剪区域扩大倍数，默认1.1倍，用于包含更多上下文
         merge_overlaps: 是否合并重叠的文本框
-        overlap_threshold: 合并重叠框的重叠度阈值（交集/最小面积）        merge_layout: 是否合并重叠的布局检测框（仅同类型框会合并）
+        overlap_threshold: 合并重叠框的重叠度阈值（交集/最小面积）
+        merge_layout: 是否合并重叠的布局检测框（仅同类型框会合并）
         layout_overlap_threshold: 合并布局框的重叠度阈值
         use_cls: 是否启用文档方向检测
-        cls_thresh: 方向检测置信度阈值
+        cls_thresh: 文档方向检测置信度阈值
+        use_textline_cls: 是否启用文本行方向检测
+        textline_cls_thresh: 文本行方向检测置信度阈值
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用，请检查依赖"})
@@ -144,7 +150,9 @@ async def analyze_structure(
                         merge_layout=merge_layout,
                         layout_overlap_threshold=layout_overlap_threshold,
                         use_cls=use_cls,
-                        cls_thresh=cls_thresh
+                        cls_thresh=cls_thresh,
+                        use_textline_cls=use_textline_cls,
+                        textline_cls_thresh=textline_cls_thresh
                     )
                     
                     # 添加页面信息
@@ -181,14 +189,16 @@ async def analyze_structure(
             result = pipeline.analyze_structure(
                 img,
                 layout_conf_threshold=layout_conf_threshold,
-                ocr_conf_threshold=ocr_det_db_thresh,  # 使用检测阈值作为OCR阈值
+                ocr_conf_threshold=ocr_det_db_thresh,
                 unclip_ratio=unclip_ratio,
                 merge_overlaps=merge_overlaps,
                 overlap_threshold=overlap_threshold,
                 merge_layout=merge_layout,
                 layout_overlap_threshold=layout_overlap_threshold,
                 use_cls=use_cls,
-                cls_thresh=cls_thresh
+                cls_thresh=cls_thresh,
+                use_textline_cls=use_textline_cls,
+                textline_cls_thresh=textline_cls_thresh
             )
 
             print("Structure Analysis Result:", result)

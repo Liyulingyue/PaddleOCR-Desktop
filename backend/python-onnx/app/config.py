@@ -137,12 +137,14 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
+            "textline_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
         },
         "options": {
             "layout_det": ["PP-DocLayout-L-ONNX", "PP-DocLayout-M-ONNX", "PP-DocLayout-S-ONNX", "PP-DocLayout_plus-L-ONNX"],
             "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
             "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
-            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"]
+            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"],
+            "textline_cls": ["PP-LCNet_x1_0_textline_ori-ONNX", "PP-LCNet_x0_25_textline_ori-ONNX"]
         }
     },
     "ppocrv5": {
@@ -150,11 +152,13 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
+            "textline_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
         },
         "options": {
             "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
             "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
-            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"]
+            "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"],
+            "textline_cls": ["PP-LCNet_x1_0_textline_ori-ONNX", "PP-LCNet_x0_25_textline_ori-ONNX"]
         }
     }
 }

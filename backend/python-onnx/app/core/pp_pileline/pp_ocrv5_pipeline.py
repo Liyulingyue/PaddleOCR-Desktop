@@ -12,17 +12,27 @@ import yaml
 from ..pp_onnx.pp_ocrv5det_onnx import PPOCRv5DetONNX
 from ..pp_onnx.pp_ocrv5rec_onnx import PPOCRv5RecONNX
 from ..pp_onnx.pp_lcnet_doc_onnx import PPLCNetDocONNX
+from ..pp_onnx.pp_lcnet_textline_onnx import PPLCNetTextLineONNX
 
 
 class PPOCRv5Pipeline:
     """
     Complete PP-OCRv5 Pipeline integrating orientation detection, text detection, and recognition
+    
+    Flow:
+    1. Document orientation detection (optional) - detect 0°/90°/180°/270° for whole image
+    2. Rotate image based on detected angle
+    3. Text detection - detect text regions
+    4. Textline orientation detection (optional) - detect 0°/180° for each textline
+    5. Rotate textline if needed
+    6. Text recognition - recognize text from each textline
     """
     
     def __init__(self, 
                  det_model_path: str = None,
                  rec_model_path: str = None, 
-                 cls_model_path: str = None,
+                 doc_cls_model_path: str = None,
+                 textline_cls_model_path: str = None,
                  use_gpu: bool = False, 
                  gpu_id: int = 0):
         """
@@ -31,31 +41,34 @@ class PPOCRv5Pipeline:
         Args:
             det_model_path: Path to detection model (optional, uses default from config)
             rec_model_path: Path to recognition model (optional, uses default from config)
-            cls_model_path: Path to classification model (optional, uses default from config)
+            doc_cls_model_path: Path to document orientation classification model (optional)
+            textline_cls_model_path: Path to textline orientation classification model (optional)
             use_gpu: Whether to use GPU
             gpu_id: GPU device ID
         """
         # 如果没有提供模型路径，使用配置文件中的默认路径
-        if det_model_path is None or rec_model_path is None or cls_model_path is None:
+        if det_model_path is None or rec_model_path is None or doc_cls_model_path is None or textline_cls_model_path is None:
             try:
                 from ...config import get_pipeline_models
                 pipeline_models = get_pipeline_models("ppocrv5")
                 if pipeline_models:
                     det_model_path = det_model_path or pipeline_models.get('ocr_det')
                     rec_model_path = rec_model_path or pipeline_models.get('ocr_rec')
-                    cls_model_path = cls_model_path or pipeline_models.get('doc_cls')
+                    doc_cls_model_path = doc_cls_model_path or pipeline_models.get('doc_cls')
+                    textline_cls_model_path = textline_cls_model_path or pipeline_models.get('textline_cls')
             except ImportError:
                 print("Warning: Could not import config, using None for model paths")
         
-        # Store configuration, don't load models yet
         self.det_model_path = det_model_path
         self.rec_model_path = rec_model_path
-        self.cls_model_path = cls_model_path
+        self.doc_cls_model_path = doc_cls_model_path
+        self.textline_cls_model_path = textline_cls_model_path
         self.use_gpu = use_gpu
         self.gpu_id = gpu_id
         
         # Model instances (initialized in load())
-        self.cls_model = None
+        self.doc_cls_model = None
+        self.textline_cls_model = None
         self.det_model = None
         self.rec_model = None
         
@@ -98,7 +111,15 @@ class PPOCRv5Pipeline:
         y2 = max(box1[3], box2[3])
         return [x1, y1, x2, y2]
 
-    def ocr(self, image: np.ndarray, conf_threshold: float = 0.5, use_close: bool = True, cls_thresh: float = 0.9, use_cls: bool = True, merge_overlaps: bool = False, overlap_threshold: float = 0.9) -> List[Dict]:
+    def ocr(self, image: np.ndarray, 
+            conf_threshold: float = 0.5, 
+            use_close: bool = True, 
+            doc_cls_thresh: float = 0.9, 
+            use_doc_cls: bool = True,
+            textline_cls_thresh: float = 0.9,
+            use_textline_cls: bool = True,
+            merge_overlaps: bool = False, 
+            overlap_threshold: float = 0.9) -> List[Dict]:
         """
         Run complete OCR pipeline on input image
         
@@ -106,8 +127,10 @@ class PPOCRv5Pipeline:
             image: Input image (BGR format)
             conf_threshold: Confidence threshold for detection and recognition
             use_close: Whether to use morphological closing in detection
-            cls_thresh: Confidence threshold for classification
-            use_cls: Whether to use document orientation classification
+            doc_cls_thresh: Confidence threshold for document orientation classification
+            use_doc_cls: Whether to use document orientation classification
+            textline_cls_thresh: Confidence threshold for textline orientation classification
+            use_textline_cls: Whether to use textline orientation classification
             merge_overlaps: Whether to merge overlapping text boxes based on overlap ratio
             overlap_threshold: Overlap threshold for merging (intersection / min(area1, area2))
             
@@ -126,28 +149,26 @@ class PPOCRv5Pipeline:
                 raise ValueError(f"Could not load image from {image}")
         
         # Step 1: Document orientation detection (optional)
-        angle = 0
-        rotation_confidence = 1.0
-        if use_cls:
-            cls_result = self.cls_model.classify(image)
-            if cls_result['confidence'] >= cls_thresh:
-                angle = int(cls_result['angle'])
-                rotation_confidence = cls_result['confidence']
+        doc_angle = 0
+        doc_rotation_confidence = 1.0
+        if use_doc_cls and self.doc_cls_model is not None:
+            cls_result = self.doc_cls_model.classify(image)
+            if cls_result['confidence'] >= doc_cls_thresh:
+                doc_angle = int(cls_result['angle'])
+                doc_rotation_confidence = cls_result['confidence']
             else:
-                # Low confidence, assume no rotation needed
-                angle = 0
-                rotation_confidence = 1.0
+                doc_angle = 0
+                doc_rotation_confidence = 1.0
         else:
-            # Skip classification, assume no rotation
-            angle = 0
-            rotation_confidence = 1.0
+            doc_angle = 0
+            doc_rotation_confidence = 1.0
         
-        # Step 2: Rotate image based on detected angle
-        if angle == 90:
+        # Step 2: Rotate image based on detected document angle
+        if doc_angle == 90:
             rotated_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        elif angle == 180:
+        elif doc_angle == 180:
             rotated_image = cv2.rotate(image, cv2.ROTATE_180)
-        elif angle == 270:
+        elif doc_angle == 270:
             rotated_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         else:
             rotated_image = image.copy()
@@ -155,7 +176,7 @@ class PPOCRv5Pipeline:
         # Step 3: Text detection on rotated image
         detections = self.det_model.detect(rotated_image, conf_threshold=conf_threshold, use_close=use_close)
         
-        # Step 4: Text recognition for each detected region
+        # Step 4: Process each detected text region
         results = []
         for det in detections:
             bbox = det['bbox']
@@ -166,7 +187,17 @@ class PPOCRv5Pipeline:
             if cropped.size == 0:
                 continue
             
-            # Recognize text
+            # Step 5: Textline orientation detection (optional)
+            textline_angle = 0
+            textline_rotation_confidence = 1.0
+            if use_textline_cls and self.textline_cls_model is not None:
+                needs_rotation, confidence = self.textline_cls_model.needs_rotation(cropped, textline_cls_thresh)
+                textline_rotation_confidence = confidence
+                if needs_rotation:
+                    textline_angle = 180
+                    cropped = cv2.rotate(cropped, cv2.ROTATE_180)
+            
+            # Step 6: Text recognition
             rec_result = self.rec_model.recognize(cropped, conf_threshold=conf_threshold)
             
             # Combine results
@@ -175,8 +206,10 @@ class PPOCRv5Pipeline:
                 'bbox': bbox,
                 'confidence': rec_result['confidence'],
                 'text_region_confidence': det['confidence'],
-                'rotation': angle,
-                'rotation_confidence': rotation_confidence
+                'doc_rotation': doc_angle,
+                'doc_rotation_confidence': doc_rotation_confidence,
+                'textline_rotation': textline_angle,
+                'textline_rotation_confidence': textline_rotation_confidence
             }
             results.append(result)
         
@@ -259,8 +292,10 @@ class PPOCRv5Pipeline:
             from pathlib import Path
             
             missing_models = []
-            if self.cls_model_path and not Path(self.cls_model_path).exists():
-                missing_models.append(f"Classification model: {self.cls_model_path}")
+            if self.doc_cls_model_path and not Path(self.doc_cls_model_path).exists():
+                missing_models.append(f"Document orientation model: {self.doc_cls_model_path}")
+            if self.textline_cls_model_path and not Path(self.textline_cls_model_path).exists():
+                missing_models.append(f"Textline orientation model: {self.textline_cls_model_path}")
             if self.det_model_path and not Path(self.det_model_path).exists():
                 missing_models.append(f"Detection model: {self.det_model_path}")
             if self.rec_model_path and not Path(self.rec_model_path).exists():
@@ -270,12 +305,15 @@ class PPOCRv5Pipeline:
                 error_msg = "模型文件缺失！请前往模型管理页面下载以下模型：\n"
                 for missing in missing_models:
                     error_msg += f"  - {missing}\n"
-                error_msg += "\n需要下载的模型：PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_textline_ori"
+                error_msg += "\n需要下载的模型：PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_doc_ori, PP-LCNet_x1_0_textline_ori"
                 print("Error: " + error_msg)
                 return False, error_msg
             
-            # Initialize orientation classifier
-            self.cls_model = PPLCNetDocONNX(model_path=self.cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
+            # Initialize document orientation classifier
+            self.doc_cls_model = PPLCNetDocONNX(model_path=self.doc_cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
+            
+            # Initialize textline orientation classifier
+            self.textline_cls_model = PPLCNetTextLineONNX(model_path=self.textline_cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
             
             # Initialize text detector
             self.det_model = PPOCRv5DetONNX(model_path=self.det_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
@@ -302,9 +340,13 @@ class PPOCRv5Pipeline:
         """
         try:
             # Clean up model instances
-            if hasattr(self, 'cls_model') and self.cls_model is not None:
-                del self.cls_model
-                self.cls_model = None
+            if hasattr(self, 'doc_cls_model') and self.doc_cls_model is not None:
+                del self.doc_cls_model
+                self.doc_cls_model = None
+            
+            if hasattr(self, 'textline_cls_model') and self.textline_cls_model is not None:
+                del self.textline_cls_model
+                self.textline_cls_model = None
             
             if hasattr(self, 'det_model') and self.det_model is not None:
                 del self.det_model
@@ -326,11 +368,12 @@ class PPOCRv5Pipeline:
         Returns:
             bool: True if all models are loaded
         """
-        return (hasattr(self, 'cls_model') and self.cls_model is not None and
+        return (hasattr(self, 'doc_cls_model') and self.doc_cls_model is not None and
+                hasattr(self, 'textline_cls_model') and self.textline_cls_model is not None and
                 hasattr(self, 'det_model') and self.det_model is not None and
                 hasattr(self, 'rec_model') and self.rec_model is not None)
 
-    def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None, cls_thresh: float = 0.9, use_cls: bool = True) -> np.ndarray:
+    def visualize(self, image: np.ndarray, results: List[Dict], output_path: str = None, doc_cls_thresh: float = 0.9, use_doc_cls: bool = True) -> np.ndarray:
         """
         Visualize OCR results on image
         
@@ -338,8 +381,8 @@ class PPOCRv5Pipeline:
             image: Original input image
             results: OCR results from ocr() method
             output_path: Path to save visualization (optional)
-            cls_thresh: Confidence threshold for classification
-            use_cls: Whether to use document orientation classification
+            doc_cls_thresh: Confidence threshold for document orientation classification
+            use_doc_cls: Whether to use document orientation classification
             
         Returns:
             Image with OCR results drawn
@@ -351,21 +394,21 @@ class PPOCRv5Pipeline:
                 raise RuntimeError(f"Failed to auto-load PP-OCRv5 models: {error_msg}")
             
         # First, apply the same rotation as in ocr()
-        angle = 0
-        if use_cls:
-            cls_result = self.cls_model.classify(image)
-            if cls_result['confidence'] >= cls_thresh:
-                angle = int(cls_result['angle'])
+        doc_angle = 0
+        if use_doc_cls and self.doc_cls_model is not None:
+            cls_result = self.doc_cls_model.classify(image)
+            if cls_result['confidence'] >= doc_cls_thresh:
+                doc_angle = int(cls_result['angle'])
             else:
-                angle = 0
+                doc_angle = 0
         else:
-            angle = 0
+            doc_angle = 0
         
-        if angle == 90:
+        if doc_angle == 90:
             vis_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        elif angle == 180:
+        elif doc_angle == 180:
             vis_image = cv2.rotate(image, cv2.ROTATE_180)
-        elif angle == 270:
+        elif doc_angle == 270:
             vis_image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         else:
             vis_image = image.copy()
@@ -385,7 +428,7 @@ class PPOCRv5Pipeline:
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
         # Add orientation info
-        orientation_text = f"Orientation: {angle}°"
+        orientation_text = f"Doc Orientation: {doc_angle}°"
         cv2.putText(vis_image, orientation_text, (10, 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
         
@@ -410,7 +453,8 @@ class PPOCRv5Pipeline:
             
         return {
             'status': 'loaded',
-            'orientation_model': self.cls_model.get_config_info(),
+            'doc_orientation_model': self.doc_cls_model.get_config_info(),
+            'textline_orientation_model': self.textline_cls_model.get_config_info(),
             'detection_model': self.det_model.get_config_info(),
             'recognition_model': self.rec_model.get_config_info()
         }

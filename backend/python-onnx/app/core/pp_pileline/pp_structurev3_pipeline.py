@@ -29,6 +29,7 @@ class PPStructureV3Pipeline:
         ocr_det_model_path: Optional[str] = None,
         ocr_rec_model_path: Optional[str] = None,
         ocr_cls_model_path: Optional[str] = None,
+        ocr_textline_cls_model_path: Optional[str] = None,
         ocr_rec_char_dict_path: Optional[str] = None,
         use_gpu: bool = False,
         gpu_id: int = 0,
@@ -42,7 +43,8 @@ class PPStructureV3Pipeline:
             layout_model_path: 布局检测模型路径（可选，使用config默认值）
             ocr_det_model_path: OCR检测模型路径（可选，使用config默认值）
             ocr_rec_model_path: OCR识别模型路径（可选，使用config默认值）
-            ocr_cls_model_path: OCR分类模型路径（可选，使用config默认值）
+            ocr_cls_model_path: OCR文档方向分类模型路径（可选，使用config默认值）
+            ocr_textline_cls_model_path: OCR文本行方向分类模型路径（可选，使用config默认值）
             ocr_rec_char_dict_path: OCR识别模型字符字典路径
             use_gpu: 是否使用GPU
             gpu_id: GPU设备ID
@@ -52,7 +54,7 @@ class PPStructureV3Pipeline:
         # 如果没有提供模型路径，使用配置文件中的默认路径
         config_available = True
         if (layout_model_path is None or ocr_det_model_path is None or 
-            ocr_rec_model_path is None or ocr_cls_model_path is None):
+            ocr_rec_model_path is None or ocr_cls_model_path is None or ocr_textline_cls_model_path is None):
             try:
                 from ...config import get_pipeline_models
                 pipeline_models = get_pipeline_models("pp_structure_v3")
@@ -61,6 +63,7 @@ class PPStructureV3Pipeline:
                     ocr_det_model_path = ocr_det_model_path or pipeline_models.get('ocr_det')
                     ocr_rec_model_path = ocr_rec_model_path or pipeline_models.get('ocr_rec')
                     ocr_cls_model_path = ocr_cls_model_path or pipeline_models.get('doc_cls')
+                    ocr_textline_cls_model_path = ocr_textline_cls_model_path or pipeline_models.get('textline_cls')
                 else:
                     config_available = False
             except ImportError:
@@ -82,35 +85,30 @@ class PPStructureV3Pipeline:
             else:
                 raise ValueError(f"Required model paths must be provided when config is unavailable: {', '.join(missing_required)}")
         
+        # 保存配置
         self.layout_model_path = layout_model_path
         self.ocr_det_model_path = ocr_det_model_path
         self.ocr_rec_model_path = ocr_rec_model_path
         self.ocr_cls_model_path = ocr_cls_model_path
+        self.ocr_textline_cls_model_path = ocr_textline_cls_model_path
         self.ocr_rec_char_dict_path = ocr_rec_char_dict_path
         self.use_gpu = use_gpu
         self.gpu_id = gpu_id
         self.layout_config = layout_config
         self.ocr_config = ocr_config
-        # 保存配置
-        self.layout_model_path = layout_model_path
-        self.use_gpu = use_gpu
-        self.gpu_id = gpu_id
         self.layout_config = layout_config or {}
 
         # 创建OCR流水线实例
-        # 注意：这里复用了完整的PPOCRv5Pipeline，主要目的是获取其方向检测模型(cls_model)
+        # 注意：这里复用了完整的PPOCRv5Pipeline，主要目的是获取其方向检测模型
         # 这种设计基于以下考虑：
         # 1. 效率：避免重复创建和加载方向检测模型，节省内存和初始化时间
         # 2. 一致性：确保PPStructure和OCR使用相同的方向检测逻辑和模型
         # 3. 简化：PPStructureV3Pipeline无需关心方向检测模型的创建细节
-        # 
-        # 然而，这种耦合并非必需。理论上，可以将方向检测模型从PPOCRv5Pipeline中拆分出来，
-        # 作为独立的组件，这样PPStructureV3Pipeline可以更灵活地控制模型生命周期，
-        # 例如只在需要时加载方向检测模型，或者使用不同的方向检测实现。
         self.ocr_pipeline = PPOCRv5Pipeline(
             det_model_path=ocr_det_model_path,
             rec_model_path=ocr_rec_model_path,
-            cls_model_path=ocr_cls_model_path,
+            doc_cls_model_path=ocr_cls_model_path,
+            textline_cls_model_path=ocr_textline_cls_model_path,
             use_gpu=use_gpu,
             gpu_id=gpu_id
         )
@@ -304,6 +302,8 @@ class PPStructureV3Pipeline:
         unclip_ratio: float = 1.1,
         use_cls: bool = True,
         cls_thresh: float = 0.9,
+        use_textline_cls: bool = False,
+        textline_cls_thresh: float = 0.9,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -316,7 +316,9 @@ class PPStructureV3Pipeline:
             ocr_conf_threshold: OCR置信度阈值
             unclip_ratio: 裁剪区域扩大倍数，默认1.1倍，用于包含更多上下文
             use_cls: 是否启用文档方向检测
-            cls_thresh: 方向检测置信度阈值
+            cls_thresh: 文档方向检测置信度阈值
+            use_textline_cls: 是否启用文本行方向检测
+            textline_cls_thresh: 文本行方向检测置信度阈值
             **kwargs: 其他参数
 
         Returns:
@@ -342,7 +344,7 @@ class PPStructureV3Pipeline:
         angle = 0
         rotation_confidence = 1.0
         if use_cls:
-            cls_result = self.ocr_pipeline.cls_model.classify(image)
+            cls_result = self.ocr_pipeline.doc_cls_model.classify(image)
             if cls_result['confidence'] >= cls_thresh:
                 angle = int(cls_result['angle'])
                 rotation_confidence = cls_result['confidence']
@@ -443,7 +445,7 @@ class PPStructureV3Pipeline:
 
             if region_type in ['text', 'paragraph_title', 'figure_title', 'table_title', 'doc_title', 'chart_title', 'list']:
                 # OCR处理
-                ocr_result = self._process_ocr_region(cropped, ocr_conf_threshold, **kwargs)
+                ocr_result = self._process_ocr_region(cropped, ocr_conf_threshold, use_textline_cls, textline_cls_thresh, **kwargs)
                 if ocr_result:
                     text_region = {
                         'bbox': bbox,
@@ -497,26 +499,29 @@ class PPStructureV3Pipeline:
 
         return results
 
-    def _process_ocr_region(self, image: np.ndarray, conf_threshold: float = 0.5, **kwargs) -> Optional[Dict[str, Any]]:
+    def _process_ocr_region(self, image: np.ndarray, conf_threshold: float = 0.5, use_textline_cls: bool = False, textline_cls_thresh: float = 0.9, **kwargs) -> Optional[Dict[str, Any]]:
         """
         处理OCR区域
 
         Args:
             image: 裁剪的图像区域
             conf_threshold: 置信度阈值
+            use_textline_cls: 是否启用文本行方向检测
+            textline_cls_thresh: 文本行方向检测置信度阈值
 
         Returns:
             Optional[Dict[str, Any]]: OCR结果
         """
         try:
             # 使用OCR流水线进行完整的OCR处理
-            # 文档结构分析优化：不开启方向检测，默认开启形态学膨胀
+            # 文档结构分析优化：不开启文档方向检测，可选开启文本行方向检测，默认开启形态学膨胀
             ocr_results = self.ocr_pipeline.ocr(
                 image, 
                 conf_threshold=conf_threshold,
-                use_cls=False,      # 文档分析默认不开启方向检测
-                cls_thresh=0.9,     # 方向检测阈值（不开启时不生效）
-                use_close=True,     # 默认开启形态学膨胀
+                use_doc_cls=False,      # 文档分析不开启文档方向检测
+                use_textline_cls=use_textline_cls,
+                textline_cls_thresh=textline_cls_thresh,
+                use_close=True,         # 默认开启形态学膨胀
                 merge_overlaps=kwargs.get('merge_overlaps', False),
                 overlap_threshold=kwargs.get('overlap_threshold', 0.9)
             )
