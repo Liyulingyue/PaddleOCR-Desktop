@@ -435,3 +435,106 @@ for img in md_data.get('images', []):
     ]
   }
 ];
+
+export const uvdocApiData: ApiCategory[] = [
+  {
+    id: 'uvdoc-endpoints',
+    title: '文档纠偏接口',
+    endpoints: [
+      {
+        id: 'uvdoc-unwarp',
+        title: '📐 文档纠偏',
+        method: 'POST',
+        path: '/api/uvdoc/unwarp',
+        description: '上传文档图像，返回纠偏后的图像。',
+        params: [
+          { name: 'file', description: '上传的图像文件（支持 JPG、PNG、BMP 等）' }
+        ],
+        additionalInfo: [
+          '返回纠偏后的 PNG 图像流',
+          '响应头 X-Elapsed-Time 包含推理耗时（秒）',
+          '响应头 X-Original-Shape 包含原始图像尺寸（H,W）',
+          '响应头 X-Result-Shape 包含输出图像尺寸（H,W）'
+        ],
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/uvdoc/unwarp" \\
+  -F "file=@document.jpg" \\
+  -o unwarped.png`
+          },
+          {
+            lang: 'Python',
+            code: (baseUrl) => `import requests
+
+resp = requests.post(
+    "${baseUrl}/api/uvdoc/unwarp",
+    files={"file": open("document.jpg", "rb")}
+)
+with open("unwarped.png", "wb") as f:
+    f.write(resp.content)
+print(f"耗时: {resp.headers.get('X-Elapsed-Time')}s")`
+          }
+        ],
+        responseTitle: '返回图像',
+        response: 'image/png (PNG 图像流)'
+      },
+      {
+        id: 'uvdoc-load',
+        title: '加载模型',
+        method: 'POST',
+        path: '/api/uvdoc/unwarp/load_model',
+        description: '预加载 UVDoc 模型到内存。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/uvdoc/unwarp/load_model"`
+          }
+        ],
+        response: '{\n  "message": "UVDoc 模型加载成功",\n  "loaded": true\n}'
+      },
+      {
+        id: 'uvdoc-unload',
+        title: '卸载模型',
+        method: 'POST',
+        path: '/api/uvdoc/unwarp/unload',
+        description: '卸载 UVDoc 模型，释放内存。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/uvdoc/unwarp/unload"`
+          }
+        ],
+        response: '{\n  "message": "UVDoc 模型已卸载",\n  "loaded": false\n}'
+      },
+      {
+        id: 'uvdoc-status',
+        title: '模型状态',
+        method: 'GET',
+        path: '/api/uvdoc/unwarp/model_status',
+        description: '查询 UVDoc 模型加载状态。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X GET "${baseUrl}/api/uvdoc/unwarp/model_status"`
+          }
+        ],
+        response: '{\n  "loaded": true // 或 false\n}'
+      },
+      {
+        id: 'uvdoc-download',
+        title: '下载模型',
+        method: 'POST',
+        path: '/api/uvdoc/unwarp/download_missing',
+        description: '下载缺失的 UVDoc 模型文件。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/uvdoc/unwarp/download_missing"`
+          }
+        ],
+        response: '{\n  "message": "UVDoc 模型文件下载完成",\n  "downloaded": true\n}'
+      }
+    ]
+  }
+];

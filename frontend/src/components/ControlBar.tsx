@@ -18,6 +18,8 @@ interface SidebarProps {
 }
 
 function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, config, onConfigChange, onShowApiModal, apiBaseUrl = '', onMessage, onShowErrorModal, pageType = 'ocr' }: SidebarProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pt: any = pageType ?? 'ocr'
   const [ocrConfigExpanded, setOcrConfigExpanded] = useState(false)
   const [ppstructureOcrConfigExpanded, setPpstructureOcrConfigExpanded] = useState(false)
   const [modelSelectionExpanded, setModelSelectionExpanded] = useState(false)
@@ -46,7 +48,9 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   }
 
   const getApiPrefix = () => {
-    return pageType === 'ppstructure' ? '/api/ppstructure' : '/api/ocr'
+    if (pt === 'ppstructure') return '/api/ppstructure'
+    if (pt === 'uvdoc') return '/api/uvdoc/unwarp'
+    return '/api/ocr'
   }
 
   const fetchModelStatus = async () => {
@@ -196,9 +200,9 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
       setLoadingModelOptions(true)
       try {
         let response;
-        if (pageType === 'ppstructure') {
+        if (pt === 'ppstructure') {
           response = await fetch(`${apiBaseUrl}/api/ppstructure/options`)
-        } else if (pageType === 'ocr') {
+        } else if (pt === 'ocr') {
           response = await fetch(`${apiBaseUrl}/api/ocr/options`)
         } else {
           return
@@ -208,7 +212,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           const data = await response.json()
           // 映射后端返回的组件名称到前端期望的名称
           let mappedOptions;
-          if (pageType === 'ppstructure') {
+          if (pt === 'ppstructure') {
             mappedOptions = {
               layout: data.options.layout_det || [],
               det: data.options.ocr_det || [],
@@ -228,7 +232,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           // 添加"Default"选项到每个模型类型
           const optionsWithDefault = {
             ...mappedOptions,
-            layout: pageType === 'ppstructure' ? [
+            layout: pt === 'ppstructure' ? [
               { value: 'Default', label: '默认模型', description: '使用系统默认的布局检测模型' },
               ...mappedOptions.layout
             ] : undefined,
@@ -273,7 +277,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
       <div className="control-section">
         <div className="button-group">
           <button onClick={onUpload} disabled={loading || !file} className="control-btn primary-btn">
-            {loading ? '处理中...' : '开始识别'}
+            {loading ? (pt === 'uvdoc' ? '纠偏中...' : '处理中...') : (pt === 'uvdoc' ? '开始纠偏' : '开始识别')}
           </button>
           <button onClick={onClear} disabled={loading} className="control-btn secondary-btn">
             清空
@@ -283,7 +287,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           <button onClick={onShowApiModal} className="control-btn info-btn">
             📖 API文档
           </button>
-          <button 
+          <button
             onClick={handleCheckAndDownloadModels}
             disabled={checkingModels}
             className="control-btn info-btn"
@@ -353,8 +357,11 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
               </div>
             </div>
           </div>
-        </div>
+        )}
 
+      </div>
+
+      {pt !== 'uvdoc' && (
       <div className="control-section">
         <div
           className="config-section-header"
@@ -380,18 +387,20 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           </div>
         )}
       </div>
+      )}
 
+      {pt !== 'uvdoc' && (
       <div className="control-section">
-        <div 
+        <div
           className="config-section-header"
           onClick={() => setOcrConfigExpanded(!ocrConfigExpanded)}
         >
-          <h4>{pageType === 'ppstructure' ? '布局检测配置参数' : 'OCR配置参数'}</h4>
+          <h4>{pt === 'ppstructure' ? '布局检测配置参数' : 'OCR配置参数'}</h4>
           <span className={`expand-icon ${ocrConfigExpanded ? 'expanded' : ''}`}>▼</span>
         </div>
         {ocrConfigExpanded && (
           <div className="config-content">
-            {pageType === 'ppstructure' ? (
+            {pt === 'ppstructure' ? (
               <>
                 <div className="config-item">
                   <label htmlFor="conf-threshold">布局检测阈值: {config.confThreshold}</label>
@@ -629,8 +638,9 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           </div>
         )}
       </div>
+      )}
 
-      {pageType === 'ocr' && (
+      {pt === 'ocr' && (
         <div className="control-section">
           <div 
             className="config-section-header"
@@ -647,7 +657,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                 </div>
               ) : modelOptions ? (
                 <>
-                  {pageType === 'ppstructure' && modelOptions.layout && (
+                  {pt === 'ppstructure' && modelOptions?.layout && (
                     <div className="config-item">
                       <label htmlFor="layout-model">布局检测模型:</label>
                       <select
@@ -664,13 +674,13 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                         ))}
                       </select>
                       <small className="config-description">
-                        {modelOptions.layout.find(opt => opt.value === (config.layoutModel || modelOptions.layout[0]?.value))?.description || '选择用于文档布局检测的模型'}
+                        {modelOptions.layout?.find(opt => opt.value === (config.layoutModel || modelOptions.layout?.[0]?.value))?.description || '选择用于文档布局检测的模型'}
                       </small>
                     </div>
                   )}
 
                   <div className="config-item">
-                    <label htmlFor="det-model">{pageType === 'ppstructure' ? 'OCR检测模型:' : '检测模型:'}</label>
+                    <label htmlFor="det-model">{pt === 'ppstructure' ? 'OCR检测模型:' : '检测模型:'}</label>
                     <select
                       id="det-model"
                       value={config.detModel || modelOptions.det[0]?.value}
@@ -690,7 +700,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                   </div>
 
                   <div className="config-item">
-                    <label htmlFor="rec-model">{pageType === 'ppstructure' ? 'OCR识别模型:' : '识别模型:'}</label>
+                    <label htmlFor="rec-model">{pt === 'ppstructure' ? 'OCR识别模型:' : '识别模型:'}</label>
                     <select
                       id="rec-model"
                       value={config.recModel || modelOptions.rec[0]?.value}
@@ -746,7 +756,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                       ))}
                     </select>
                     <small className="config-description">
-                      {modelOptions.textlineCls.find(opt => opt.value === (config.textlineClsModel || modelOptions.textlineCls[0]?.value))?.description || '选择用于文本行方向检测的模型'}
+                      {modelOptions.textlineCls?.find(opt => opt.value === (config.textlineClsModel || modelOptions.textlineCls?.[0]?.value))?.description || '选择用于文本行方向检测的模型'}
                     </small>
                   </div>
                   )}
@@ -761,7 +771,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         </div>
       )}
 
-      {pageType === 'ppstructure' && (
+      {pt === 'ppstructure' && (
         <div className="control-section">
           <div 
             className="config-section-header"

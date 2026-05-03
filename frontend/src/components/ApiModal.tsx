@@ -1,11 +1,11 @@
 import React, { useRef } from 'react'
-import { ocrApiData, ppStructureApiData, type ApiEndpoint, type ApiCategory } from '../utils/apiData'
+import { ocrApiData, ppStructureApiData, uvdocApiData, type ApiEndpoint } from '../utils/apiData'
 
 interface ApiModalProps {
   isOpen: boolean
   onClose: () => void
   apiBaseUrl: string
-  type: 'ocr' | 'ppstructure'
+  type: 'ocr' | 'ppstructure' | 'uvdoc'
 }
 
 const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, apiBaseUrl, type }) => {
@@ -13,7 +13,7 @@ const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, apiBaseUrl, type }
 
   if (!isOpen) return null
 
-  const data = type === 'ocr' ? ocrApiData : ppStructureApiData
+  const data = type === 'ocr' ? ocrApiData : type === 'ppstructure' ? ppStructureApiData : uvdocApiData
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
@@ -136,7 +136,7 @@ const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, apiBaseUrl, type }
 
         <div className="api-modal-main">
           <div className="api-modal-header">
-            <h3>API 文档 - {type === 'ocr' ? 'OCR 识别' : 'PP-Structure'}</h3>
+            <h3>API 文档 - {type === 'ocr' ? 'OCR 识别' : type === 'ppstructure' ? 'PP-Structure' : '文档纠偏'}</h3>
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
           
