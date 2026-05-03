@@ -36,6 +36,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const [loadingModelOptions, setLoadingModelOptions] = useState(false)
   const [modelLoaded, setModelLoaded] = useState<boolean | null>(null)
   const [modelActionLoading, setModelActionLoading] = useState(false)
+  const [useGpu, setUseGpu] = useState(false)
   const [checkingModels, setCheckingModels] = useState(false)
   const [checkStatus, setCheckStatus] = useState<string | null>(null)
 
@@ -58,6 +59,9 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
         const j = await res.json()
         console.log('Model status data:', j)
         setModelLoaded(Boolean(j.loaded))
+        if (j.use_gpu !== undefined) {
+          setUseGpu(j.use_gpu)
+        }
         return j.loaded
       } else {
         const t = await res.text()
@@ -75,9 +79,11 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const loadModel = async () => {
     setModelActionLoading(true)
     try {
-      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/load`, { method: 'POST' })
+      const formData = new FormData()
+      formData.append('use_gpu', useGpu.toString())
+      const res = await fetch(`${apiBaseUrl}${getApiPrefix()}/load`, { method: 'POST', body: formData })
       if (res.ok) {
-        showMsg('模型加载完成')
+        showMsg(useGpu ? '模型加载完成 (GPU)' : '模型加载完成 (CPU)')
         setModelLoaded(true)
       } else {
         const t = await res.text()
@@ -322,6 +328,19 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                 <div className="model-status-right">
                   <button className="control-btn small refresh-btn" onClick={() => fetchModelStatus()}>刷新</button>
                 </div>
+              </div>
+
+              <div className="config-item">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={useGpu}
+                    onChange={(e) => setUseGpu(e.target.checked)}
+                    disabled={modelActionLoading || modelLoaded === true}
+                  />
+                  使用GPU加速
+                </label>
+                <small className="config-description">启用GPU推理（需重新加载模型）</small>
               </div>
 
               <div className="model-controls row">

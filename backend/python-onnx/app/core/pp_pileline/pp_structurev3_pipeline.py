@@ -117,9 +117,12 @@ class PPStructureV3Pipeline:
         self.layout_model = None
         self._loaded = False
 
-    def load(self) -> tuple[bool, str]:
+    def load(self, use_gpu: bool = None) -> tuple[bool, str]:
         """
         加载所有文档结构分析模型
+
+        Args:
+            use_gpu: 是否使用GPU。如果为None，使用初始化时的值。
 
         Returns:
             tuple: (success: bool, error_message: str)
@@ -127,6 +130,12 @@ class PPStructureV3Pipeline:
         try:
             if self._loaded:
                 return True, ""
+            
+            # 更新 GPU 配置
+            if use_gpu is not None:
+                self.use_gpu = use_gpu
+            
+            print(f"加载PP-StructureV3模型... (use_gpu={self.use_gpu})")
 
             # 检查模型路径是否存在
             from pathlib import Path
@@ -160,7 +169,7 @@ class PPStructureV3Pipeline:
             )
 
             # 加载OCR流水线
-            success, error_msg = self.ocr_pipeline.load()
+            success, error_msg = self.ocr_pipeline.load(use_gpu=self.use_gpu)
             if not success:
                 raise RuntimeError(f"Failed to load OCR pipeline: {error_msg}")
 

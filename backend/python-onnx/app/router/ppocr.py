@@ -18,17 +18,24 @@ from ..config import get_work_dir, get_pipeline_default_models, get_pipeline_mod
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
 _global_pipeline_models = None
+_global_use_gpu = False
 
 def get_global_pipeline():
     """获取全局pipeline实例"""
     global _global_pipeline
     return _global_pipeline
 
-def set_global_pipeline(pipeline, models_key):
+def set_global_pipeline(pipeline, models_key, use_gpu=False):
     """设置全局pipeline实例"""
-    global _global_pipeline, _global_pipeline_models
+    global _global_pipeline, _global_pipeline_models, _global_use_gpu
     _global_pipeline = pipeline
     _global_pipeline_models = models_key
+    _global_use_gpu = use_gpu
+
+def get_global_use_gpu():
+    """获取全局GPU使用状态"""
+    global _global_use_gpu
+    return _global_use_gpu
 
 def get_pipeline_models_key(det_model, rec_model, doc_cls_model, textline_cls_model):
     """生成pipeline模型的唯一键"""
@@ -437,8 +444,13 @@ async def ocr_result_to_text(ocr_result: dict = Body(...)):
 
 
 @router.post("/load")
-async def load_model():
-    """加载OCR模型"""
+async def load_model(use_gpu: bool = Form(False)):
+    """
+    加载OCR模型
+    
+    Args:
+        use_gpu: 是否使用GPU加载模型
+    """
     try:
         # 检查pipeline是否可用
         if not HAS_PIPELINE:
@@ -475,13 +487,14 @@ async def load_model():
                 rec_model_path=str(rec_model),
                 doc_cls_model_path=str(doc_cls_model),
                 textline_cls_model_path=str(textline_cls_model),
-                use_gpu=False
+                use_gpu=use_gpu
             )
-            set_global_pipeline(pipeline, "default")
+            set_global_pipeline(pipeline, "default", use_gpu=use_gpu)
 
         # 加载模型
-        if pipeline.load():
-            return {"message": "OCR模型加载成功", "loaded": True}
+        if pipeline.load(use_gpu=use_gpu):
+            set_global_pipeline(pipeline, "default", use_gpu=use_gpu)
+            return {"message": "OCR模型加载成功", "loaded": True, "use_gpu": use_gpu}
         else:
             return JSONResponse(status_code=500, content={"error": "模型加载失败", "loaded": False})
 
@@ -567,6 +580,7 @@ async def model_status():
 
         # 检查模型是否已加载
         pipeline = get_global_pipeline()
+        use_gpu = get_global_use_gpu()
         if pipeline is not None:
             try:
                 is_loaded = pipeline.is_loaded()
@@ -574,25 +588,29 @@ async def model_status():
                     return {
                         "loaded": True,
                         "message": "Pipeline模式：模型已加载",
-                        "mode": "pipeline"
+                        "mode": "pipeline",
+                        "use_gpu": use_gpu
                     }
                 else:
                     return {
                         "loaded": False,
                         "message": "Pipeline模式：模型文件完整但未加载",
-                        "mode": "pipeline"
+                        "mode": "pipeline",
+                        "use_gpu": use_gpu
                     }
             except Exception as e:
                 return {
                     "loaded": False,
                     "message": f"Pipeline模式：检查模型状态时出错 - {str(e)}",
-                    "mode": "pipeline"
+                    "mode": "pipeline",
+                    "use_gpu": use_gpu
                 }
         else:
             return {
                 "loaded": False,
                 "message": "Pipeline模式：模型文件完整但未初始化",
-                "mode": "pipeline"
+                "mode": "pipeline",
+                "use_gpu": use_gpu
             }
 
     except Exception as e:

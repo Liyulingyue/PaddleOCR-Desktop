@@ -274,9 +274,12 @@ class PPOCRv5Pipeline:
         
         return merged_results
 
-    def load(self) -> tuple[bool, str]:
+    def load(self, use_gpu: bool = None) -> tuple[bool, str]:
         """
         Load the OCR pipeline models.
+        
+        Args:
+            use_gpu: Whether to use GPU. If None, use the value from __init__.
         
         Returns:
             tuple: (success: bool, error_message: str)
@@ -286,7 +289,11 @@ class PPOCRv5Pipeline:
                 print("Models already loaded")
                 return True, ""
             
-            print("Loading PP-OCRv5 Pipeline models...")
+            # 更新 GPU 配置
+            if use_gpu is not None:
+                self.use_gpu = use_gpu
+            
+            print(f"Loading PP-OCRv5 Pipeline models... (use_gpu={self.use_gpu})")
             
             # 检查模型路径是否存在
             from pathlib import Path

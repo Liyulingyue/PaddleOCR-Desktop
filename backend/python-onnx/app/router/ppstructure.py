@@ -25,16 +25,23 @@ from ..config import get_work_dir, get_pipeline_default_models, get_pipeline_mod
 
 # 全局pipeline实例（用于保持加载状态）
 _global_pipeline = None
+_global_use_gpu = False
 
 def get_global_pipeline():
     """获取全局pipeline实例"""
     global _global_pipeline
     return _global_pipeline
 
-def set_global_pipeline(pipeline):
+def set_global_pipeline(pipeline, use_gpu=False):
     """设置全局pipeline实例"""
-    global _global_pipeline
+    global _global_pipeline, _global_use_gpu
     _global_pipeline = pipeline
+    _global_use_gpu = use_gpu
+
+def get_global_use_gpu():
+    """获取全局GPU使用状态"""
+    global _global_use_gpu
+    return _global_use_gpu
 
 def pdf_to_images_from_bytes(pdf_bytes, dpi=200):
     """将PDF字节数据转换为图像列表"""
@@ -638,12 +645,13 @@ async def model_status():
         ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
         ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
         ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        ocr_textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
 
-        # 检查模型目录内是否存在 inference.onnx 文件
         models_exist = all([(layout_model_path / "inference.onnx").exists(), 
                            (ocr_det_model / "inference.onnx").exists(), 
                            (ocr_rec_model / "inference.onnx").exists(), 
-                           (ocr_cls_model / "inference.onnx").exists()])
+                           (ocr_cls_model / "inference.onnx").exists(),
+                           (ocr_textline_cls_model / "inference.onnx").exists()])
 
         if not models_exist:
             return {
@@ -654,6 +662,7 @@ async def model_status():
 
         # 检查模型是否已加载
         pipeline = get_global_pipeline()
+        use_gpu = get_global_use_gpu()
         if pipeline is not None:
             try:
                 is_loaded = pipeline.is_loaded()
@@ -661,25 +670,29 @@ async def model_status():
                     return {
                         "loaded": True,
                         "message": "PP-StructureV3模式：模型已加载",
-                        "mode": "pp-structure-v3"
+                        "mode": "pp-structure-v3",
+                        "use_gpu": use_gpu
                     }
                 else:
                     return {
                         "loaded": False,
                         "message": "PP-StructureV3模式：模型文件完整但未加载",
-                        "mode": "pp-structure-v3"
+                        "mode": "pp-structure-v3",
+                        "use_gpu": use_gpu
                     }
             except Exception as e:
                 return {
                     "loaded": False,
                     "message": f"PP-StructureV3模式：检查模型状态时出错 - {str(e)}",
-                    "mode": "pp-structure-v3"
+                    "mode": "pp-structure-v3",
+                    "use_gpu": use_gpu
                 }
         else:
             return {
                 "loaded": False,
                 "message": "PP-StructureV3模式：模型文件完整但未初始化",
-                "mode": "pp-structure-v3"
+                "mode": "pp-structure-v3",
+                "use_gpu": use_gpu
             }
 
     except Exception as e:
