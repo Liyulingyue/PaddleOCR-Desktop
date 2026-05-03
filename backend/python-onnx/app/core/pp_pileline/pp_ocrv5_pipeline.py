@@ -13,6 +13,7 @@ from ..pp_onnx.pp_ocrv5det_onnx import PPOCRv5DetONNX
 from ..pp_onnx.pp_ocrv5rec_onnx import PPOCRv5RecONNX
 from ..pp_onnx.pp_lcnet_doc_onnx import PPLCNetDocONNX
 from ..pp_onnx.pp_lcnet_textline_onnx import PPLCNetTextLineONNX
+from ..pp_onnx.pp_uvdoc_onnx import UVDocONNX
 
 
 class PPOCRv5Pipeline:
@@ -20,6 +21,7 @@ class PPOCRv5Pipeline:
     Complete PP-OCRv5 Pipeline integrating orientation detection, text detection, and recognition
     
     Flow:
+    0. Document unwarping (optional) - correct geometric distortion
     1. Document orientation detection (optional) - detect 0°/90°/180°/270° for whole image
     2. Rotate image based on detected angle
     3. Text detection - detect text regions
@@ -33,21 +35,11 @@ class PPOCRv5Pipeline:
                  rec_model_path: str = None, 
                  doc_cls_model_path: str = None,
                  textline_cls_model_path: str = None,
+                 uvdoc_model_path: str = None,
                  use_gpu: bool = False, 
                  gpu_id: int = 0):
-        """
-        Initialize the complete PP-OCRv5 pipeline
-        
-        Args:
-            det_model_path: Path to detection model (optional, uses default from config)
-            rec_model_path: Path to recognition model (optional, uses default from config)
-            doc_cls_model_path: Path to document orientation classification model (optional)
-            textline_cls_model_path: Path to textline orientation classification model (optional)
-            use_gpu: Whether to use GPU
-            gpu_id: GPU device ID
-        """
         # 如果没有提供模型路径，使用配置文件中的默认路径
-        if det_model_path is None or rec_model_path is None or doc_cls_model_path is None or textline_cls_model_path is None:
+        if det_model_path is None or rec_model_path is None or doc_cls_model_path is None or textline_cls_model_path is None or uvdoc_model_path is None:
             try:
                 from ...config import get_pipeline_models
                 pipeline_models = get_pipeline_models("ppocrv5")
@@ -56,6 +48,7 @@ class PPOCRv5Pipeline:
                     rec_model_path = rec_model_path or pipeline_models.get('ocr_rec')
                     doc_cls_model_path = doc_cls_model_path or pipeline_models.get('doc_cls')
                     textline_cls_model_path = textline_cls_model_path or pipeline_models.get('textline_cls')
+                    uvdoc_model_path = uvdoc_model_path or pipeline_models.get('uvdoc')
             except ImportError:
                 print("Warning: Could not import config, using None for model paths")
         
@@ -63,10 +56,12 @@ class PPOCRv5Pipeline:
         self.rec_model_path = rec_model_path
         self.doc_cls_model_path = doc_cls_model_path
         self.textline_cls_model_path = textline_cls_model_path
+        self.uvdoc_model_path = uvdoc_model_path
         self.use_gpu = use_gpu
         self.gpu_id = gpu_id
         
         # Model instances (initialized in load())
+        self.uvdoc_model = None
         self.doc_cls_model = None
         self.textline_cls_model = None
         self.det_model = None
@@ -118,6 +113,7 @@ class PPOCRv5Pipeline:
             use_doc_cls: bool = True,
             textline_cls_thresh: float = 0.9,
             use_textline_cls: bool = True,
+            use_uvdoc: bool = False,
             merge_overlaps: bool = False, 
             overlap_threshold: float = 0.9) -> List[Dict]:
         """
@@ -131,6 +127,7 @@ class PPOCRv5Pipeline:
             use_doc_cls: Whether to use document orientation classification
             textline_cls_thresh: Confidence threshold for textline orientation classification
             use_textline_cls: Whether to use textline orientation classification
+            use_uvdoc: Whether to use document unwarping (UVDoc)
             merge_overlaps: Whether to merge overlapping text boxes based on overlap ratio
             overlap_threshold: Overlap threshold for merging (intersection / min(area1, area2))
             
@@ -147,6 +144,16 @@ class PPOCRv5Pipeline:
             image = cv2.imread(image)
             if image is None:
                 raise ValueError(f"Could not load image from {image}")
+        
+        # Step 0: Document unwarping (optional)
+        uvdoc_applied = False
+        if use_uvdoc and self.uvdoc_model is not None:
+            try:
+                image, uvdoc_time = self.uvdoc_model.unwarp(image)
+                uvdoc_applied = True
+                print(f"UVDoc applied, time: {uvdoc_time:.3f}s")
+            except Exception as e:
+                print(f"UVDoc failed: {e}, continuing without unwarping")
         
         # Step 1: Document orientation detection (optional)
         doc_angle = 0
@@ -209,7 +216,8 @@ class PPOCRv5Pipeline:
                 'doc_rotation': doc_angle,
                 'doc_rotation_confidence': doc_rotation_confidence,
                 'textline_rotation': textline_angle,
-                'textline_rotation_confidence': textline_rotation_confidence
+                'textline_rotation_confidence': textline_rotation_confidence,
+                'uvdoc_applied': uvdoc_applied
             }
             results.append(result)
         
@@ -299,6 +307,8 @@ class PPOCRv5Pipeline:
             from pathlib import Path
             
             missing_models = []
+            if self.uvdoc_model_path and not Path(self.uvdoc_model_path).exists():
+                missing_models.append(f"UVDoc model: {self.uvdoc_model_path}")
             if self.doc_cls_model_path and not Path(self.doc_cls_model_path).exists():
                 missing_models.append(f"Document orientation model: {self.doc_cls_model_path}")
             if self.textline_cls_model_path and not Path(self.textline_cls_model_path).exists():
@@ -312,9 +322,13 @@ class PPOCRv5Pipeline:
                 error_msg = "模型文件缺失！请前往模型管理页面下载以下模型：\n"
                 for missing in missing_models:
                     error_msg += f"  - {missing}\n"
-                error_msg += "\n需要下载的模型：PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_doc_ori, PP-LCNet_x1_0_textline_ori"
+                error_msg += "\n需要下载的模型：UVDoc-ONNX, PP-OCRv5_mobile_det, PP-OCRv5_mobile_rec, PP-LCNet_x1_0_doc_ori, PP-LCNet_x1_0_textline_ori"
                 print("Error: " + error_msg)
                 return False, error_msg
+            
+            # Initialize UVDoc model (optional)
+            if self.uvdoc_model_path and Path(self.uvdoc_model_path).exists():
+                self.uvdoc_model = UVDocONNX(model_path=self.uvdoc_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
             
             # Initialize document orientation classifier
             self.doc_cls_model = PPLCNetDocONNX(model_path=self.doc_cls_model_path, use_gpu=self.use_gpu, gpu_id=self.gpu_id)
@@ -347,6 +361,10 @@ class PPOCRv5Pipeline:
         """
         try:
             # Clean up model instances
+            if hasattr(self, 'uvdoc_model') and self.uvdoc_model is not None:
+                del self.uvdoc_model
+                self.uvdoc_model = None
+            
             if hasattr(self, 'doc_cls_model') and self.doc_cls_model is not None:
                 del self.doc_cls_model
                 self.doc_cls_model = None

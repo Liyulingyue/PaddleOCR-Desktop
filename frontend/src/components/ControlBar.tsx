@@ -353,6 +353,31 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
               </div>
             </div>
           </div>
+        </div>
+
+      <div className="control-section">
+        <div
+          className="config-section-header"
+          onClick={() => setOcrConfigExpanded(!ocrConfigExpanded)}
+        >
+          <h4>预处理配置</h4>
+          <span className={`expand-icon ${ocrConfigExpanded ? 'expanded' : ''}`}>▼</span>
+        </div>
+        {ocrConfigExpanded && (
+          <div className="config-content">
+            <div className="config-item">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={config.useUVDoc}
+                  onChange={(e) => onConfigChange({ ...config, useUVDoc: e.target.checked })}
+                  disabled={loading}
+                />
+                启用文档纠偏 (UVDoc)
+              </label>
+              <small className="config-description">纠正弯曲/透视变形的文档图像，在方向检测前执行</small>
+            </div>
+          </div>
         )}
       </div>
 

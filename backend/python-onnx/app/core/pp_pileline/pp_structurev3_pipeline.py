@@ -12,6 +12,7 @@ import numpy as np
 import base64
 
 from ..pp_onnx.pp_doclayout_onnx import PPDocLayoutONNX
+from ..pp_onnx.pp_uvdoc_onnx import UVDocONNX
 from .pp_ocrv5_pipeline import PPOCRv5Pipeline
 
 
@@ -30,6 +31,7 @@ class PPStructureV3Pipeline:
         ocr_rec_model_path: Optional[str] = None,
         ocr_cls_model_path: Optional[str] = None,
         ocr_textline_cls_model_path: Optional[str] = None,
+        uvdoc_model_path: Optional[str] = None,
         ocr_rec_char_dict_path: Optional[str] = None,
         use_gpu: bool = False,
         gpu_id: int = 0,
@@ -45,6 +47,7 @@ class PPStructureV3Pipeline:
             ocr_rec_model_path: OCR识别模型路径（可选，使用config默认值）
             ocr_cls_model_path: OCR文档方向分类模型路径（可选，使用config默认值）
             ocr_textline_cls_model_path: OCR文本行方向分类模型路径（可选，使用config默认值）
+            uvdoc_model_path: 文档纠偏模型路径（可选，使用config默认值）
             ocr_rec_char_dict_path: OCR识别模型字符字典路径
             use_gpu: 是否使用GPU
             gpu_id: GPU设备ID
@@ -54,7 +57,7 @@ class PPStructureV3Pipeline:
         # 如果没有提供模型路径，使用配置文件中的默认路径
         config_available = True
         if (layout_model_path is None or ocr_det_model_path is None or 
-            ocr_rec_model_path is None or ocr_cls_model_path is None or ocr_textline_cls_model_path is None):
+            ocr_rec_model_path is None or ocr_cls_model_path is None or ocr_textline_cls_model_path is None or uvdoc_model_path is None):
             try:
                 from ...config import get_pipeline_models
                 pipeline_models = get_pipeline_models("pp_structure_v3")
@@ -64,6 +67,7 @@ class PPStructureV3Pipeline:
                     ocr_rec_model_path = ocr_rec_model_path or pipeline_models.get('ocr_rec')
                     ocr_cls_model_path = ocr_cls_model_path or pipeline_models.get('doc_cls')
                     ocr_textline_cls_model_path = ocr_textline_cls_model_path or pipeline_models.get('textline_cls')
+                    uvdoc_model_path = uvdoc_model_path or pipeline_models.get('uvdoc')
                 else:
                     config_available = False
             except ImportError:
@@ -91,24 +95,20 @@ class PPStructureV3Pipeline:
         self.ocr_rec_model_path = ocr_rec_model_path
         self.ocr_cls_model_path = ocr_cls_model_path
         self.ocr_textline_cls_model_path = ocr_textline_cls_model_path
+        self.uvdoc_model_path = uvdoc_model_path
         self.ocr_rec_char_dict_path = ocr_rec_char_dict_path
         self.use_gpu = use_gpu
         self.gpu_id = gpu_id
-        self.layout_config = layout_config
-        self.ocr_config = ocr_config
         self.layout_config = layout_config or {}
+        self.ocr_config = ocr_config
 
         # 创建OCR流水线实例
-        # 注意：这里复用了完整的PPOCRv5Pipeline，主要目的是获取其方向检测模型
-        # 这种设计基于以下考虑：
-        # 1. 效率：避免重复创建和加载方向检测模型，节省内存和初始化时间
-        # 2. 一致性：确保PPStructure和OCR使用相同的方向检测逻辑和模型
-        # 3. 简化：PPStructureV3Pipeline无需关心方向检测模型的创建细节
         self.ocr_pipeline = PPOCRv5Pipeline(
             det_model_path=ocr_det_model_path,
             rec_model_path=ocr_rec_model_path,
             doc_cls_model_path=ocr_cls_model_path,
             textline_cls_model_path=ocr_textline_cls_model_path,
+            uvdoc_model_path=uvdoc_model_path,
             use_gpu=use_gpu,
             gpu_id=gpu_id
         )
@@ -313,6 +313,7 @@ class PPStructureV3Pipeline:
         cls_thresh: float = 0.9,
         use_textline_cls: bool = False,
         textline_cls_thresh: float = 0.9,
+        use_uvdoc: bool = False,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -328,6 +329,7 @@ class PPStructureV3Pipeline:
             cls_thresh: 文档方向检测置信度阈值
             use_textline_cls: 是否启用文本行方向检测
             textline_cls_thresh: 文本行方向检测置信度阈值
+            use_uvdoc: 是否启用文档纠偏（UVDoc）
             **kwargs: 其他参数
 
         Returns:
@@ -345,7 +347,17 @@ class PPStructureV3Pipeline:
             if image is None:
                 raise ValueError(f"Failed to load image from {image}")
 
-        # 步骤0: 文档方向检测（可选）
+        # 步骤0: 文档纠偏（可选）
+        uvdoc_applied = False
+        if use_uvdoc and self.ocr_pipeline.uvdoc_model is not None:
+            try:
+                image, uvdoc_time = self.ocr_pipeline.uvdoc_model.unwarp(image)
+                uvdoc_applied = True
+                print(f"UVDoc applied in Structure pipeline, time: {uvdoc_time:.3f}s")
+            except Exception as e:
+                print(f"UVDoc failed: {e}, continuing without unwarping")
+
+        # 步骤1: 文档方向检测（可选）
         # 注意：这里复用了PPOCRv5Pipeline中已创建的方向检测模型(cls_model)
         # 这种设计基于效率考虑，避免重复加载相同的方向检测模型
         # 但实际上，方向检测模型可以从PPOCRv5Pipeline中拆分出来，
@@ -403,6 +415,7 @@ class PPStructureV3Pipeline:
             'rotated_image_shape': rotated_image.shape,
             'rotation': angle,
             'rotation_confidence': rotation_confidence,
+            'uvdoc_applied': uvdoc_applied,
             'layout_regions': layout_regions,
             'text_regions': [],
             'table_regions': [],

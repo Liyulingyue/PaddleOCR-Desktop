@@ -37,9 +37,9 @@ def get_global_use_gpu():
     global _global_use_gpu
     return _global_use_gpu
 
-def get_pipeline_models_key(det_model, rec_model, doc_cls_model, textline_cls_model):
+def get_pipeline_models_key(det_model, rec_model, doc_cls_model, textline_cls_model, uvdoc_model):
     """生成pipeline模型的唯一键"""
-    return f"{det_model}|{rec_model}|{doc_cls_model}|{textline_cls_model}"
+    return f"{det_model}|{rec_model}|{doc_cls_model}|{textline_cls_model}|{uvdoc_model}"
 
 try:
     import fitz  # pymupdf
@@ -101,12 +101,14 @@ async def recognize(
     use_doc_cls: bool = Form(True),
     textline_cls_thresh: float = Form(0.9),
     use_textline_cls: bool = Form(True),
+    use_uvdoc: bool = Form(False),
     merge_overlaps: bool = Form(False),
     overlap_threshold: float = Form(0.9),
     det_model: str = Form(None),
     rec_model: str = Form(None),
     doc_cls_model: str = Form(None),
-    textline_cls_model: str = Form(None)
+    textline_cls_model: str = Form(None),
+    uvdoc_model: str = Form(None)
 ):
     """
     使用PP-OCRv5 Pipeline进行OCR识别（返回pipeline格式）
@@ -118,6 +120,7 @@ async def recognize(
         use_doc_cls: 是否使用文档方向分类
         textline_cls_thresh: 文本行方向分类阈值
         use_textline_cls: 是否使用文本行方向分类
+        use_uvdoc: 是否使用文档纠偏（UVDoc）
         merge_overlaps: 是否合并重叠的文本框
         overlap_threshold: 合并重叠框的重叠度阈值（交集/最小面积）
         det_model: 检测模型名称
@@ -141,7 +144,7 @@ async def recognize(
         actual_textline_cls_model = textline_cls_model if textline_cls_model not in [None, "Default"] else defaults["textline_cls"]
         
         # 获取或创建pipeline实例
-        current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_doc_cls_model, actual_textline_cls_model)
+        current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_doc_cls_model, actual_textline_cls_model, actual_uvdoc_model)
         pipeline = get_global_pipeline()
         
         if pipeline is None or _global_pipeline_models != current_models_key:
@@ -152,12 +155,14 @@ async def recognize(
             actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
             actual_doc_cls_model = doc_cls_model if doc_cls_model not in [None, "Default"] else defaults["doc_cls"]
             actual_textline_cls_model = textline_cls_model if textline_cls_model not in [None, "Default"] else defaults["textline_cls"]
+            actual_uvdoc_model = uvdoc_model if uvdoc_model not in [None, "Default"] else defaults.get("uvdoc")
         
             # 根据选择的模型获取路径
             det_model_path = get_model_path_from_registry(actual_det_model)
             rec_model_path = get_model_path_from_registry(actual_rec_model)
             doc_cls_model_path = get_model_path_from_registry(actual_doc_cls_model)
             textline_cls_model_path = get_model_path_from_registry(actual_textline_cls_model)
+            uvdoc_model_path = get_model_path_from_registry(actual_uvdoc_model) if actual_uvdoc_model else None
             
             if not all([det_model_path, rec_model_path, doc_cls_model_path, textline_cls_model_path]):
                 return JSONResponse(status_code=400, content={"error": f"模型文件缺失: det={det_model_path}, rec={rec_model_path}, doc_cls={doc_cls_model_path}, textline_cls={textline_cls_model_path}"})
@@ -167,6 +172,7 @@ async def recognize(
                 rec_model_path=rec_model_path,
                 doc_cls_model_path=doc_cls_model_path,
                 textline_cls_model_path=textline_cls_model_path,
+                uvdoc_model_path=uvdoc_model_path,
                 use_gpu=False
             )
             set_global_pipeline(pipeline, current_models_key)
@@ -186,7 +192,7 @@ async def recognize(
             for page_idx, img in enumerate(images):
                 try:
                     # 使用pipeline进行OCR
-                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
+                    page_results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, use_uvdoc=use_uvdoc, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
                     # 直接返回pipeline格式
                     formatted_results = []
@@ -220,7 +226,7 @@ async def recognize(
             img = np.array(img)
 
             # 使用pipeline进行OCR
-            results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
+            results = pipeline.ocr(img, conf_threshold=det_db_thresh, doc_cls_thresh=doc_cls_thresh, use_doc_cls=use_doc_cls, textline_cls_thresh=textline_cls_thresh, use_textline_cls=use_textline_cls, use_uvdoc=use_uvdoc, merge_overlaps=merge_overlaps, overlap_threshold=overlap_threshold)
 
             formatted_results = []
             for result in results:
@@ -464,6 +470,7 @@ async def load_model(use_gpu: bool = Form(False)):
         rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
         doc_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
         textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
+        uvdoc_model = models_dir / "models" / "UVDoc-ONNX"
 
         missing_files = []
         if not (det_model / "inference.onnx").exists():
@@ -474,6 +481,8 @@ async def load_model(use_gpu: bool = Form(False)):
             missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
         if not (textline_cls_model / "inference.onnx").exists():
             missing_files.append("PP-LCNet_x1_0_textline_ori-ONNX/inference.onnx")
+        if not (uvdoc_model / "inference.onnx").exists():
+            missing_files.append("UVDoc-ONNX/inference.onnx")
 
         if missing_files:
             error_msg = f"模型文件不完整，缺少以下文件：\n" + "\n".join(f"  - {file}" for file in missing_files)
@@ -512,6 +521,7 @@ async def download_missing_models():
             rec_model = get_model_path_from_registry("PP-OCRv5_mobile_rec-ONNX")
             doc_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
             textline_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_textline_ori-ONNX")
+            uvdoc_model = get_model_path_from_registry("UVDoc-ONNX")
             
             if not all([det_model, rec_model, doc_cls_model, textline_cls_model]):
                 missing = []
@@ -523,6 +533,8 @@ async def download_missing_models():
                     missing.append("PP-LCNet_x1_0_doc_ori-ONNX")
                 if not textline_cls_model:
                     missing.append("PP-LCNet_x1_0_textline_ori-ONNX")
+                if not uvdoc_model:
+                    missing.append("UVDoc-ONNX")
                 error_msg = f"模型下载失败，无法获取：{', '.join(missing)}"
                 return JSONResponse(status_code=500, content={"error": error_msg})
             

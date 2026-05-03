@@ -77,11 +77,13 @@ async def analyze_structure(
     cls_thresh: float = Form(0.9),
     use_textline_cls: bool = Form(False),
     textline_cls_thresh: float = Form(0.9),
+    use_uvdoc: bool = Form(False),
     layout_model: str = Form(None),
     ocr_det_model: str = Form(None),
     ocr_rec_model: str = Form(None),
     cls_model: str = Form(None),
-    textline_cls_model: str = Form(None)
+    textline_cls_model: str = Form(None),
+    uvdoc_model: str = Form(None)
 ):
     """
     使用PP-StructureV3 Pipeline进行文档结构分析（返回layout格式）
@@ -99,6 +101,7 @@ async def analyze_structure(
         cls_thresh: 文档方向检测置信度阈值
         use_textline_cls: 是否启用文本行方向检测
         textline_cls_thresh: 文本行方向检测置信度阈值
+        use_uvdoc: 是否使用文档纠偏（UVDoc）
     """
     if not HAS_PIPELINE:
         return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用，请检查依赖"})
@@ -118,11 +121,17 @@ async def analyze_structure(
         actual_ocr_det_model = ocr_det_model if ocr_det_model not in [None, "Default"] else defaults["ocr_det"]
         actual_ocr_rec_model = ocr_rec_model if ocr_rec_model not in [None, "Default"] else defaults["ocr_rec"]
         actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
+        actual_uvdoc_model = uvdoc_model if uvdoc_model not in [None, "Default"] else defaults.get("uvdoc")
+        uvdoc_model_path = get_model_path_from_registry(actual_uvdoc_model) if actual_uvdoc_model else None
         
         # 获取或创建pipeline实例
         pipeline = get_global_pipeline()
         if pipeline is None:
-            pipeline = PPStructureV3Pipeline(use_gpu=False, gpu_id=0)
+            pipeline = PPStructureV3Pipeline(
+                uvdoc_model_path=uvdoc_model_path,
+                use_gpu=False,
+                gpu_id=0
+            )
             set_global_pipeline(pipeline)
 
         # 确保模型已加载
@@ -159,7 +168,8 @@ async def analyze_structure(
                         use_cls=use_cls,
                         cls_thresh=cls_thresh,
                         use_textline_cls=use_textline_cls,
-                        textline_cls_thresh=textline_cls_thresh
+                        textline_cls_thresh=textline_cls_thresh,
+                        use_uvdoc=use_uvdoc
                     )
                     
                     # 添加页面信息
@@ -205,7 +215,8 @@ async def analyze_structure(
                 use_cls=use_cls,
                 cls_thresh=cls_thresh,
                 use_textline_cls=use_textline_cls,
-                textline_cls_thresh=textline_cls_thresh
+                textline_cls_thresh=textline_cls_thresh,
+                use_uvdoc=use_uvdoc
             )
 
             print("Structure Analysis Result:", result)
@@ -544,6 +555,8 @@ async def load_model():
         ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
         ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
         ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
+        textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
+        uvdoc_model = models_dir / "models" / "UVDoc-ONNX"
 
         # 检查模型目录内是否存在 inference.onnx 文件
         missing_files = []
@@ -555,6 +568,10 @@ async def load_model():
             missing_files.append("PP-OCRv5_mobile_rec-ONNX/inference.onnx")
         if not (ocr_cls_model / "inference.onnx").exists():
             missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
+        if not (textline_cls_model / "inference.onnx").exists():
+            missing_files.append("PP-LCNet_x1_0_textline_ori-ONNX/inference.onnx")
+        if not (uvdoc_model / "inference.onnx").exists():
+            missing_files.append("UVDoc-ONNX/inference.onnx")
 
         if missing_files:
             error_msg = f"模型文件不完整，缺少以下文件：\n" + "\n".join(f"  - {file}" for file in missing_files)
@@ -592,6 +609,8 @@ async def download_missing_models():
             ocr_det_model = get_model_path_from_registry("PP-OCRv5_mobile_det-ONNX")
             ocr_rec_model = get_model_path_from_registry("PP-OCRv5_mobile_rec-ONNX")
             ocr_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_doc_ori-ONNX")
+            textline_cls_model = get_model_path_from_registry("PP-LCNet_x1_0_textline_ori-ONNX")
+            uvdoc_model = get_model_path_from_registry("UVDoc-ONNX")
             
             if not all([layout_model_path, ocr_det_model, ocr_rec_model, ocr_cls_model]):
                 missing = []
@@ -603,6 +622,10 @@ async def download_missing_models():
                     missing.append("PP-OCRv5_mobile_rec-ONNX")
                 if not ocr_cls_model:
                     missing.append("PP-LCNet_x1_0_doc_ori-ONNX")
+                if not textline_cls_model:
+                    missing.append("PP-LCNet_x1_0_textline_ori-ONNX")
+                if not uvdoc_model:
+                    missing.append("UVDoc-ONNX")
                 error_msg = f"模型下载失败，无法获取：{', '.join(missing)}"
                 return JSONResponse(status_code=500, content={"error": error_msg})
             

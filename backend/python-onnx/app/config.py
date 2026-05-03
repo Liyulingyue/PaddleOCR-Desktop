@@ -133,6 +133,7 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
 PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
     "pp_structure_v3": {
         "models": {
+            "uvdoc": "UVDoc-ONNX",
             "layout_det": "PP-DocLayout-L-ONNX",
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
@@ -140,6 +141,7 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "textline_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
         },
         "options": {
+            "uvdoc": ["UVDoc-ONNX"],
             "layout_det": ["PP-DocLayout-L-ONNX", "PP-DocLayout-M-ONNX", "PP-DocLayout-S-ONNX", "PP-DocLayout_plus-L-ONNX"],
             "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
             "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
@@ -149,12 +151,14 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "ppocrv5": {
         "models": {
+            "uvdoc": "UVDoc-ONNX",
             "ocr_det": "PP-OCRv5_mobile_det-ONNX",
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
             "textline_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
         },
         "options": {
+            "uvdoc": ["UVDoc-ONNX"],
             "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
             "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
             "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"],

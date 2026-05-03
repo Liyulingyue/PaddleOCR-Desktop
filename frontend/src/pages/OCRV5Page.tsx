@@ -24,7 +24,8 @@ function OCRV5Page() {
     detModel: 'Default',
     recModel: 'Default',
     clsModel: 'Default',
-    textlineClsModel: 'Default'
+    textlineClsModel: 'Default',
+    useUVDoc: false
   })
   const [message, setMessage] = useState<string | null>(null)
   const [showApiModal, setShowApiModal] = useState(false)
@@ -103,6 +104,7 @@ function OCRV5Page() {
     useCls: boolean
     textlineClsThresh: number
     useTextlineCls: boolean
+    useUVDoc: boolean
     mergeOverlaps: boolean
     overlapThreshold: number
     detModel: string
@@ -136,6 +138,7 @@ function OCRV5Page() {
       formData.append('use_doc_cls', config.useCls.toString())
       formData.append('textline_cls_thresh', config.textlineClsThresh.toString())
       formData.append('use_textline_cls', config.useTextlineCls.toString())
+      formData.append('use_uvdoc', config.useUVDoc.toString())
       formData.append('merge_overlaps', config.mergeOverlaps.toString())
       formData.append('overlap_threshold', config.overlapThreshold.toString())
       

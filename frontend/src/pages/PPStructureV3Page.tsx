@@ -27,6 +27,7 @@ function PPStructureV3Page() {
     clsThresh: 0.9,
     useTextlineCls: false,
     textlineClsThresh: 0.9,
+    useUVDoc: false,
     layoutModel: 'Default',
     ocrDetModel: 'Default',
     ocrRecModel: 'Default',
@@ -106,7 +107,7 @@ function PPStructureV3Page() {
     setDrawnImage(null)
   }
 
-  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number; useTextlineCls: boolean; textlineClsThresh: number; layoutModel: string; ocrDetModel: string; ocrRecModel: string; clsModel: string; textlineClsModel: string }) => {
+  const handleConfigChange = (newConfig: { confThreshold: number; ocrDetThresh: number; unclipRatio: number; mergeOverlaps: boolean; overlapThreshold: number; mergeLayout: boolean; layoutOverlapThreshold: number; useCls: boolean; clsThresh: number; useTextlineCls: boolean; textlineClsThresh: number; useUVDoc: boolean; layoutModel: string; ocrDetModel: string; ocrRecModel: string; clsModel: string; textlineClsModel: string }) => {
     setConfig(newConfig)
   }
 
@@ -136,6 +137,7 @@ function PPStructureV3Page() {
     formData.append('cls_thresh', config.clsThresh.toString())
     formData.append('use_textline_cls', config.useTextlineCls.toString())
     formData.append('textline_cls_thresh', config.textlineClsThresh.toString())
+    formData.append('use_uvdoc', config.useUVDoc.toString())
     
     // 总是发送模型参数（即使是默认值）
     formData.append('layout_model', config.layoutModel || 'Default')
