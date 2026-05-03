@@ -56,7 +56,7 @@ function HeaderBar({
               📄 PP-Structure V3 布局检测
             </Link>
             <Link to="/uvdoc" className="sidebar-link" onClick={closeSidebar}>
-              📐 文档纠偏 (UVDoc)
+              📐 UVDoc 文档纠偏
             </Link>
             <Link to="/model-management" className="sidebar-link" onClick={closeSidebar}>
               📦 模型管理
