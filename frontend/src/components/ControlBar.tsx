@@ -50,6 +50,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
   const getApiPrefix = () => {
     if (pt === 'ppstructure') return '/api/ppstructure'
     if (pt === 'uvdoc') return '/api/uvdoc/unwarp'
+    if (pt === 'formula') return '/api/formula/recognize'
     return '/api/ocr'
   }
 
@@ -204,6 +205,13 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
           response = await fetch(`${apiBaseUrl}/api/ppstructure/options`)
         } else if (pt === 'ocr') {
           response = await fetch(`${apiBaseUrl}/api/ocr/options`)
+        } else if (pt === 'formula') {
+          response = await fetch(`${apiBaseUrl}/api/formula/recognize/model_options`)
+          if (response.ok) {
+            const data = await response.json()
+            setModelOptions({ formula: data.options || [] })
+            return
+          }
         } else {
           return
         }
@@ -277,7 +285,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
       <div className="control-section">
         <div className="button-group">
           <button onClick={onUpload} disabled={loading || !file} className="control-btn primary-btn">
-            {loading ? (pt === 'uvdoc' ? '纠偏中...' : '处理中...') : (pt === 'uvdoc' ? '开始纠偏' : '开始识别')}
+            {loading ? (pt === 'uvdoc' ? '纠偏中...' : pt === 'formula' ? '识别中...' : '处理中...') : (pt === 'uvdoc' ? '开始纠偏' : pt === 'formula' ? '开始识别' : '开始识别')}
           </button>
           <button onClick={onClear} disabled={loading} className="control-btn secondary-btn">
             清空
@@ -361,7 +369,7 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
 
       </div>
 
-      {pt !== 'uvdoc' && (
+      {pt !== 'uvdoc' && pt !== 'formula' && (
       <div className="control-section">
         <div
           className="config-section-header"
@@ -384,12 +392,26 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
               </label>
               <small className="config-description">纠正弯曲/透视变形的文档图像，在方向检测前执行</small>
             </div>
+            {pt === 'ppstructure' && (
+            <div className="config-item">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={config.useFormulaRec ?? true}
+                  onChange={(e) => onConfigChange({ ...config, useFormulaRec: e.target.checked })}
+                  disabled={loading}
+                />
+                启用公式识别 (PP-FormulaNet)
+              </label>
+              <small className="config-description">识别文档中的数学公式并输出 LaTeX 文本</small>
+            </div>
+            )}
           </div>
         )}
       </div>
       )}
 
-      {pt !== 'uvdoc' && (
+      {pt !== 'uvdoc' && pt !== 'formula' && (
       <div className="control-section">
         <div
           className="config-section-header"
@@ -640,13 +662,13 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
       </div>
       )}
 
-      {pt === 'ocr' && (
+      {(pt === 'ocr' || pt === 'formula') && (
         <div className="control-section">
-          <div 
+          <div
             className="config-section-header"
             onClick={() => setModelSelectionExpanded(!modelSelectionExpanded)}
           >
-            <h4>模型选择</h4>
+            <h4>{pt === 'formula' ? '公式模型' : '模型选择'}</h4>
             <span className={`expand-icon ${modelSelectionExpanded ? 'expanded' : ''}`}>▼</span>
           </div>
           {modelSelectionExpanded && (
@@ -679,6 +701,8 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                     </div>
                   )}
 
+                  {pt !== 'formula' && (
+                  <>
                   <div className="config-item">
                     <label htmlFor="det-model">{pt === 'ppstructure' ? 'OCR检测模型:' : '检测模型:'}</label>
                     <select
@@ -757,6 +781,30 @@ function ControlBar({ onFileSelect, file, loading, error, onUpload, onClear, con
                     </select>
                     <small className="config-description">
                       {modelOptions.textlineCls?.find(opt => opt.value === (config.textlineClsModel || modelOptions.textlineCls?.[0]?.value))?.description || '选择用于文本行方向检测的模型'}
+                    </small>
+                  </div>
+                  )}
+                  </>
+                  )}
+
+                  {pt === 'formula' && modelOptions.formula && (
+                  <div className="config-item">
+                    <label htmlFor="formula-model">公式识别模型:</label>
+                    <select
+                      id="formula-model"
+                      value={config.formulaModel || modelOptions.formula[0]?.value}
+                      onChange={(e) => onConfigChange({ ...config, formulaModel: e.target.value })}
+                      disabled={loading}
+                      className="model-select"
+                    >
+                      {modelOptions.formula.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="config-description">
+                      {modelOptions.formula.find(opt => opt.value === (config.formulaModel || modelOptions.formula[0]?.value))?.description || '选择公式识别模型'}
                     </small>
                   </div>
                   )}

@@ -538,3 +538,103 @@ print(f"耗时: {resp.headers.get('X-Elapsed-Time')}s")`
     ]
   }
 ];
+
+export const formulaApiData: ApiCategory[] = [
+  {
+    id: 'formula-endpoints',
+    title: '公式识别接口',
+    endpoints: [
+      {
+        id: 'formula-recognize',
+        title: '📐 公式识别',
+        method: 'POST',
+        path: '/api/formula/recognize',
+        description: '上传公式图像，返回 LaTeX 文本。',
+        params: [
+          { name: 'file', description: '上传的公式图像文件（支持 JPG、PNG、BMP 等）' }
+        ],
+        additionalInfo: [
+          '返回 JSON，包含 latex（LaTeX文本）、elapsed（耗时秒）',
+          '支持 PP-FormulaNet_plus-M/S/L 模型',
+        ],
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/formula/recognize" \\
+  -F "file=@formula.png"`
+          },
+          {
+            lang: 'Python',
+            code: (baseUrl) => `import requests
+
+resp = requests.post(
+    "${baseUrl}/api/formula/recognize",
+    files={"file": open("formula.png", "rb")}
+)
+result = resp.json()
+print(f"LaTeX: {result['latex']}")
+print(f"耗时: {result['elapsed']}s")`
+          }
+        ],
+        responseTitle: '返回结果',
+        response: '{\n  "latex": "\\\\frac{-b \\\\pm \\\\sqrt{b^2-4ac}}{2a}",\n  "elapsed": 0.569\n}'
+      },
+      {
+        id: 'formula-load',
+        title: '加载模型',
+        method: 'POST',
+        path: '/api/formula/recognize/load',
+        description: '预加载公式识别模型到内存。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/formula/recognize/load"`
+          }
+        ],
+        response: '{\n  "message": "公式识别模型加载成功",\n  "loaded": true\n}'
+      },
+      {
+        id: 'formula-unload',
+        title: '卸载模型',
+        method: 'POST',
+        path: '/api/formula/recognize/unload',
+        description: '卸载公式识别模型，释放内存。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/formula/recognize/unload"`
+          }
+        ],
+        response: '{\n  "message": "公式识别模型已卸载",\n  "loaded": false\n}'
+      },
+      {
+        id: 'formula-status',
+        title: '模型状态',
+        method: 'GET',
+        path: '/api/formula/recognize/model_status',
+        description: '查询公式识别模型加载状态。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X GET "${baseUrl}/api/formula/recognize/model_status"`
+          }
+        ],
+        response: '{\n  "loaded": true // 或 false\n}'
+      },
+      {
+        id: 'formula-download',
+        title: '下载模型',
+        method: 'POST',
+        path: '/api/formula/recognize/download_missing',
+        description: '下载缺失的公式识别模型文件。',
+        examples: [
+          {
+            lang: 'cURL',
+            code: (baseUrl) => `curl -X POST "${baseUrl}/api/formula/recognize/download_missing"`
+          }
+        ],
+        response: '{\n  "message": "公式识别模型文件下载完成",\n  "downloaded": true\n}'
+      }
+    ]
+  }
+];

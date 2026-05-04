@@ -6,6 +6,7 @@ interface ImageResultPanelProps {
   elapsedTime: number | null
   resultShape?: string
   onMessage?: (msg: string) => void
+  title?: string
 }
 
 export default function ImageResultPanel({
@@ -13,7 +14,8 @@ export default function ImageResultPanel({
   imageFile,
   elapsedTime,
   resultShape,
-  onMessage
+  onMessage,
+  title = '结果'
 }: ImageResultPanelProps) {
   const [copied, setCopied] = useState(false)
 
@@ -45,7 +47,7 @@ export default function ImageResultPanel({
   return (
     <aside className="result-panel">
       <div className="result-panel-header">
-        <h3>结果</h3>
+        <h3>{title}</h3>
         <div className="action-buttons">
           {imageUrl && (
             <>

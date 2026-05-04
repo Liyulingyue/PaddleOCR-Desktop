@@ -5,6 +5,7 @@ import OCRV5Page from './pages/OCRV5Page'
 import PPStructureV3Page from './pages/PPStructureV3Page'
 import ModelManagementPage from './pages/ModelManagementPage'
 import UVDocPage from './pages/UVDocPage'
+import FormulaPage from './pages/FormulaPage'
 import HeaderBar from './components/HeaderBar'
 import { TauriCloseHandler } from './components/TauriCloseHandler'
 import { BackendLogPanel } from './components/BackendLogPanel'
@@ -55,6 +56,7 @@ function App() {
             <Route path="/ppstructurev3" element={<PPStructureV3Page />} />
             <Route path="/model-management" element={<ModelManagementPage />} />
             <Route path="/uvdoc" element={<UVDocPage />} />
+            <Route path="/formula" element={<FormulaPage />} />
           </Routes>
         </>
       )}

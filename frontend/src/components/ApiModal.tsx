@@ -1,11 +1,11 @@
 import React, { useRef } from 'react'
-import { ocrApiData, ppStructureApiData, uvdocApiData, type ApiEndpoint } from '../utils/apiData'
+import { ocrApiData, ppStructureApiData, uvdocApiData, formulaApiData, type ApiEndpoint } from '../utils/apiData'
 
 interface ApiModalProps {
   isOpen: boolean
   onClose: () => void
   apiBaseUrl: string
-  type: 'ocr' | 'ppstructure' | 'uvdoc'
+  type: 'ocr' | 'ppstructure' | 'uvdoc' | 'formula'
 }
 
 const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, apiBaseUrl, type }) => {
@@ -13,7 +13,7 @@ const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, apiBaseUrl, type }
 
   if (!isOpen) return null
 
-  const data = type === 'ocr' ? ocrApiData : type === 'ppstructure' ? ppStructureApiData : uvdocApiData
+  const data = type === 'ocr' ? ocrApiData : type === 'ppstructure' ? ppStructureApiData : type === 'uvdoc' ? uvdocApiData : formulaApiData
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)

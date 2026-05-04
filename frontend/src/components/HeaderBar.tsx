@@ -58,6 +58,9 @@ function HeaderBar({
             <Link to="/uvdoc" className="sidebar-link" onClick={closeSidebar}>
               📐 UVDoc 文档纠偏
             </Link>
+            <Link to="/formula" className="sidebar-link" onClick={closeSidebar}>
+              📐 PP-FormulaNet 公式识别
+            </Link>
             <Link to="/model-management" className="sidebar-link" onClick={closeSidebar}>
               📦 模型管理
             </Link>

@@ -128,6 +128,31 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "UVDoc 文档处理",
         "description": "UV文档处理模型"
     },
+
+    "PP-FormulaNet_plus-M-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-FormulaNet_plus-M-ONNX",
+        "local_path": "models/PP-FormulaNet_plus-M-ONNX",
+        "label": "PP-FormulaNet plus-M (推荐)",
+        "description": "高精度公式识别模型，推荐使用"
+    },
+    "PP-FormulaNet_plus-S-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-FormulaNet_plus-S-ONNX",
+        "local_path": "models/PP-FormulaNet_plus-S-ONNX",
+        "label": "PP-FormulaNet plus-S (快速)",
+        "description": "轻量级公式识别模型，推理速度快"
+    },
+    "PP-FormulaNet_plus-L-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-FormulaNet_plus-L-ONNX",
+        "local_path": "models/PP-FormulaNet_plus-L-ONNX",
+        "label": "PP-FormulaNet plus-L (高精度)",
+        "description": "最高精度公式识别模型，需768x768输入"
+    },
+    "PP-FormulaNet-L-ONNX": {
+        "modelscope_id": "Liyulingyue/PP-FormulaNet-L-ONNX",
+        "local_path": "models/PP-FormulaNet-L-ONNX",
+        "label": "PP-FormulaNet L (高精度)",
+        "description": "高精度公式识别模型，需768x768输入"
+    },
 }
 
 PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
@@ -139,6 +164,7 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_rec": "PP-OCRv5_mobile_rec-ONNX",
             "doc_cls": "PP-LCNet_x1_0_doc_ori-ONNX",
             "textline_cls": "PP-LCNet_x1_0_textline_ori-ONNX",
+            "formula_rec": "PP-FormulaNet_plus-M-ONNX",
         },
         "options": {
             "uvdoc": ["UVDoc-ONNX"],
@@ -146,7 +172,8 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "ocr_det": ["PP-OCRv5_mobile_det-ONNX", "PP-OCRv5_server_det-ONNX"],
             "ocr_rec": ["PP-OCRv5_mobile_rec-ONNX", "PP-OCRv5_server_rec-ONNX"],
             "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"],
-            "textline_cls": ["PP-LCNet_x1_0_textline_ori-ONNX", "PP-LCNet_x0_25_textline_ori-ONNX"]
+            "textline_cls": ["PP-LCNet_x1_0_textline_ori-ONNX", "PP-LCNet_x0_25_textline_ori-ONNX"],
+            "formula_rec": ["PP-FormulaNet_plus-M-ONNX", "PP-FormulaNet_plus-S-ONNX", "PP-FormulaNet_plus-L-ONNX", "PP-FormulaNet-L-ONNX"],
         }
     },
     "ppocrv5": {

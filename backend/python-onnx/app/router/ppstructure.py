@@ -83,7 +83,9 @@ async def analyze_structure(
     ocr_rec_model: str = Form(None),
     cls_model: str = Form(None),
     textline_cls_model: str = Form(None),
-    uvdoc_model: str = Form(None)
+    uvdoc_model: str = Form(None),
+    formula_rec_model: str = Form(None),
+    use_formula_rec: bool = Form(True)
 ):
     """
     使用PP-StructureV3 Pipeline进行文档结构分析（返回layout格式）
@@ -122,13 +124,16 @@ async def analyze_structure(
         actual_ocr_rec_model = ocr_rec_model if ocr_rec_model not in [None, "Default"] else defaults["ocr_rec"]
         actual_cls_model = cls_model if cls_model not in [None, "Default"] else defaults["doc_cls"]
         actual_uvdoc_model = uvdoc_model if uvdoc_model not in [None, "Default"] else defaults.get("uvdoc")
+        actual_formula_rec_model = formula_rec_model if formula_rec_model not in [None, "Default"] else defaults.get("formula_rec")
         uvdoc_model_path = get_model_path_from_registry(actual_uvdoc_model) if actual_uvdoc_model else None
+        formula_rec_model_path = get_model_path_from_registry(actual_formula_rec_model) if actual_formula_rec_model else None
         
         # 获取或创建pipeline实例
         pipeline = get_global_pipeline()
         if pipeline is None:
             pipeline = PPStructureV3Pipeline(
                 uvdoc_model_path=uvdoc_model_path,
+                formula_rec_model_path=formula_rec_model_path,
                 use_gpu=False,
                 gpu_id=0
             )
@@ -169,7 +174,8 @@ async def analyze_structure(
                         cls_thresh=cls_thresh,
                         use_textline_cls=use_textline_cls,
                         textline_cls_thresh=textline_cls_thresh,
-                        use_uvdoc=use_uvdoc
+                        use_uvdoc=use_uvdoc,
+                        use_formula_rec=use_formula_rec
                     )
                     
                     # 添加页面信息
@@ -216,7 +222,8 @@ async def analyze_structure(
                 cls_thresh=cls_thresh,
                 use_textline_cls=use_textline_cls,
                 textline_cls_thresh=textline_cls_thresh,
-                use_uvdoc=use_uvdoc
+                use_uvdoc=use_uvdoc,
+                use_formula_rec=use_formula_rec
             )
 
             print("Structure Analysis Result:", result)
@@ -547,31 +554,33 @@ async def load_model():
         if not HAS_PIPELINE:
             return JSONResponse(status_code=500, content={"error": "Pipeline功能不可用"})
 
-        # 检查模型文件是否存在
-        from pathlib import Path
-        models_dir = Path(get_work_dir())
-        # 注意：模型路径应该是目录路径，模型类会自动在内部拼接 /inference.onnx
-        layout_model_path = models_dir / "models" / "PP-DocLayout-L-ONNX"
-        ocr_det_model = models_dir / "models" / "PP-OCRv5_mobile_det-ONNX"
-        ocr_rec_model = models_dir / "models" / "PP-OCRv5_mobile_rec-ONNX"
-        ocr_cls_model = models_dir / "models" / "PP-LCNet_x1_0_doc_ori-ONNX"
-        textline_cls_model = models_dir / "models" / "PP-LCNet_x1_0_textline_ori-ONNX"
-        uvdoc_model = models_dir / "models" / "UVDoc-ONNX"
+        # 使用config系统获取模型路径
+        defaults = get_pipeline_default_models("pp_structure_v3")
+        layout_path = get_model_path_from_registry(defaults.get("layout_det", "PP-DocLayout-L-ONNX"))
+        ocr_det_path = get_model_path_from_registry(defaults.get("ocr_det", "PP-OCRv5_mobile_det-ONNX"))
+        ocr_rec_path = get_model_path_from_registry(defaults.get("ocr_rec", "PP-OCRv5_mobile_rec-ONNX"))
+        ocr_cls_path = get_model_path_from_registry(defaults.get("doc_cls", "PP-LCNet_x1_0_doc_ori-ONNX"))
+        textline_cls_path = get_model_path_from_registry(defaults.get("textline_cls", "PP-LCNet_x1_0_textline_ori-ONNX"))
+        uvdoc_path = get_model_path_from_registry(defaults.get("uvdoc", "UVDoc-ONNX"))
+        formula_path = get_model_path_from_registry(defaults.get("formula_rec", "PP-FormulaNet_plus-M-ONNX"))
 
-        # 检查模型目录内是否存在 inference.onnx 文件
+        # 检查模型文件是否存在
         missing_files = []
-        if not (layout_model_path / "inference.onnx").exists():
-            missing_files.append("PP-DocLayout-L-ONNX/inference.onnx")
-        if not (ocr_det_model / "inference.onnx").exists():
-            missing_files.append("PP-OCRv5_mobile_det-ONNX/inference.onnx")
-        if not (ocr_rec_model / "inference.onnx").exists():
-            missing_files.append("PP-OCRv5_mobile_rec-ONNX/inference.onnx")
-        if not (ocr_cls_model / "inference.onnx").exists():
-            missing_files.append("PP-LCNet_x1_0_doc_ori-ONNX/inference.onnx")
-        if not (textline_cls_model / "inference.onnx").exists():
-            missing_files.append("PP-LCNet_x1_0_textline_ori-ONNX/inference.onnx")
-        if not (uvdoc_model / "inference.onnx").exists():
-            missing_files.append("UVDoc-ONNX/inference.onnx")
+        from pathlib import Path
+        if layout_path and not (Path(layout_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-DocLayout-L-ONNX (path: {layout_path})")
+        if ocr_det_path and not (Path(ocr_det_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-OCRv5_mobile_det-ONNX (path: {ocr_det_path})")
+        if ocr_rec_path and not (Path(ocr_rec_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-OCRv5_mobile_rec-ONNX (path: {ocr_rec_path})")
+        if ocr_cls_path and not (Path(ocr_cls_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-LCNet_x1_0_doc_ori-ONNX (path: {ocr_cls_path})")
+        if textline_cls_path and not (Path(textline_cls_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-LCNet_x1_0_textline_ori-ONNX (path: {textline_cls_path})")
+        if uvdoc_path and not (Path(uvdoc_path) / "inference.onnx").exists():
+            missing_files.append(f"UVDoc-ONNX (path: {uvdoc_path})")
+        if formula_path and not (Path(formula_path) / "inference.onnx").exists():
+            missing_files.append(f"PP-FormulaNet_plus-M-ONNX (path: {formula_path})")
 
         if missing_files:
             error_msg = f"模型文件不完整，缺少以下文件：\n" + "\n".join(f"  - {file}" for file in missing_files)
@@ -581,10 +590,13 @@ async def load_model():
         pipeline = get_global_pipeline()
         if pipeline is None:
             pipeline = PPStructureV3Pipeline(
-                layout_model_path=str(layout_model_path),
-                ocr_det_model_path=str(ocr_det_model),
-                ocr_rec_model_path=str(ocr_rec_model),
-                ocr_cls_model_path=str(ocr_cls_model),
+                layout_model_path=layout_path,
+                ocr_det_model_path=ocr_det_path,
+                ocr_rec_model_path=ocr_rec_path,
+                ocr_cls_model_path=ocr_cls_path,
+                ocr_textline_cls_model_path=textline_cls_path,
+                uvdoc_model_path=uvdoc_path,
+                formula_rec_model_path=formula_path,
                 use_gpu=False
             )
             set_global_pipeline(pipeline)

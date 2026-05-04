@@ -13,6 +13,7 @@ import base64
 
 from ..pp_onnx.pp_doclayout_onnx import PPDocLayoutONNX
 from ..pp_onnx.pp_uvdoc_onnx import UVDocONNX
+from ..pp_onnx.pp_formulanet_onnx import PPFormulaNetONNX
 from .pp_ocrv5_pipeline import PPOCRv5Pipeline
 
 
@@ -32,6 +33,7 @@ class PPStructureV3Pipeline:
         ocr_cls_model_path: Optional[str] = None,
         ocr_textline_cls_model_path: Optional[str] = None,
         uvdoc_model_path: Optional[str] = None,
+        formula_rec_model_path: Optional[str] = None,
         ocr_rec_char_dict_path: Optional[str] = None,
         use_gpu: bool = False,
         gpu_id: int = 0,
@@ -48,6 +50,7 @@ class PPStructureV3Pipeline:
             ocr_cls_model_path: OCR文档方向分类模型路径（可选，使用config默认值）
             ocr_textline_cls_model_path: OCR文本行方向分类模型路径（可选，使用config默认值）
             uvdoc_model_path: 文档纠偏模型路径（可选，使用config默认值）
+            formula_rec_model_path: 公式识别模型路径（可选，使用config默认值）
             ocr_rec_char_dict_path: OCR识别模型字符字典路径
             use_gpu: 是否使用GPU
             gpu_id: GPU设备ID
@@ -56,8 +59,9 @@ class PPStructureV3Pipeline:
         """
         # 如果没有提供模型路径，使用配置文件中的默认路径
         config_available = True
-        if (layout_model_path is None or ocr_det_model_path is None or 
-            ocr_rec_model_path is None or ocr_cls_model_path is None or ocr_textline_cls_model_path is None or uvdoc_model_path is None):
+        if (layout_model_path is None or ocr_det_model_path is None or
+            ocr_rec_model_path is None or ocr_cls_model_path is None or ocr_textline_cls_model_path is None or
+            uvdoc_model_path is None or formula_rec_model_path is None):
             try:
                 from ...config import get_pipeline_models
                 pipeline_models = get_pipeline_models("pp_structure_v3")
@@ -68,6 +72,7 @@ class PPStructureV3Pipeline:
                     ocr_cls_model_path = ocr_cls_model_path or pipeline_models.get('doc_cls')
                     ocr_textline_cls_model_path = ocr_textline_cls_model_path or pipeline_models.get('textline_cls')
                     uvdoc_model_path = uvdoc_model_path or pipeline_models.get('uvdoc')
+                    formula_rec_model_path = formula_rec_model_path or pipeline_models.get('formula_rec')
                 else:
                     config_available = False
             except ImportError:
@@ -96,11 +101,15 @@ class PPStructureV3Pipeline:
         self.ocr_cls_model_path = ocr_cls_model_path
         self.ocr_textline_cls_model_path = ocr_textline_cls_model_path
         self.uvdoc_model_path = uvdoc_model_path
+        self.formula_rec_model_path = formula_rec_model_path
         self.ocr_rec_char_dict_path = ocr_rec_char_dict_path
         self.use_gpu = use_gpu
         self.gpu_id = gpu_id
         self.layout_config = layout_config or {}
         self.ocr_config = ocr_config
+
+        # 公式识别模型实例（可选）
+        self.formula_model = None
 
         # 创建OCR流水线实例
         self.ocr_pipeline = PPOCRv5Pipeline(
@@ -151,7 +160,13 @@ class PPStructureV3Pipeline:
                 missing_models.append(f"OCR Recognition model: {self.ocr_pipeline.rec_model_path}")
             if hasattr(self.ocr_pipeline, 'cls_model_path') and self.ocr_pipeline.cls_model_path and not Path(self.ocr_pipeline.cls_model_path).exists():
                 missing_models.append(f"OCR Classification model: {self.ocr_pipeline.cls_model_path}")
-            
+
+            # 检查公式识别模型路径（不阻塞，仅警告）
+            formula_missing = False
+            if self.formula_rec_model_path and not Path(self.formula_rec_model_path).exists():
+                formula_missing = True
+                print(f"Warning: Formula recognition model not found: {self.formula_rec_model_path}. Formula recognition will be disabled.")
+
             if missing_models:
                 error_msg = "模型文件缺失！请前往模型管理页面下载以下模型：\n"
                 for missing in missing_models:
@@ -167,6 +182,20 @@ class PPStructureV3Pipeline:
                 gpu_id=self.gpu_id,
                 **self.layout_config
             )
+
+            # 初始化公式识别模型（可选）
+            if not formula_missing and self.formula_rec_model_path:
+                try:
+                    self.formula_model = PPFormulaNetONNX(
+                        model_path=self.formula_rec_model_path,
+                        use_gpu=self.use_gpu,
+                        gpu_id=self.gpu_id
+                    )
+                    print(f"公式识别模型加载成功: {self.formula_rec_model_path}")
+                    print(f"  input_size={self.formula_model.input_size}, max_new_tokens={self.formula_model.max_new_tokens}")
+                except Exception as e:
+                    print(f"公式识别模型加载失败: {e}")
+                    self.formula_model = None
 
             # 加载OCR流水线
             success, error_msg = self.ocr_pipeline.load(use_gpu=self.use_gpu)
@@ -193,6 +222,11 @@ class PPStructureV3Pipeline:
             if self.layout_model is not None:
                 del self.layout_model
                 self.layout_model = None
+
+            # 卸载公式识别模型
+            if self.formula_model is not None:
+                del self.formula_model
+                self.formula_model = None
 
             # 卸载OCR流水线
             self.ocr_pipeline.unload()
@@ -492,8 +526,11 @@ class PPStructureV3Pipeline:
                     results['table_regions'].append(table_region)
 
             elif region_type == 'formula':
-                # 公式处理
-                formula_result = self._process_formula_region(cropped)
+                # 公式处理（仅当公式识别模型已加载时）
+                use_formula_rec = kwargs.get('use_formula_rec', True)
+                formula_result = None
+                if use_formula_rec and self.formula_model is not None:
+                    formula_result = self._process_formula_region(cropped)
                 if formula_result:
                     formula_region = {
                         'bbox': bbox,
@@ -597,12 +634,21 @@ class PPStructureV3Pipeline:
         Returns:
             Optional[Dict[str, Any]]: 公式结果
         """
-        # TODO: 实现公式识别
-        # 目前返回占位符
-        return {
-            'latex': 'E = mc^{2}',
-            'text': 'E = mc^2'
-        }
+        if self.formula_model is None:
+            return None
+
+        try:
+            latex, elapsed = self.formula_model.predict_latex(image)
+            if latex:
+                return {
+                    'latex': latex,
+                    'text': latex,
+                    'time': elapsed
+                }
+            return None
+        except Exception as e:
+            print(f"Formula recognition error: {e}")
+            return None
 
     def visualize(self, image: np.ndarray, regions: List[Dict[str, Any]]) -> np.ndarray:
         """
