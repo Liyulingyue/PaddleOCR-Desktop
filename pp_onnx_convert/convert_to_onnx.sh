@@ -44,6 +44,19 @@ if [ ! -d "$MODEL_DIR" ]; then
     exit 1
 fi
 
+# If common paddle model files are not directly in MODEL_DIR, check for a single nested subdir
+if [ ! -f "$MODEL_DIR/inference.pdiparams" ] && [ ! -f "$MODEL_DIR/model_state.pdparams" ]; then
+    # gather immediate subdirectories
+    mapfile -t subdirs < <(find "$MODEL_DIR" -maxdepth 1 -mindepth 1 -type d -printf "%p\n")
+    if [ ${#subdirs[@]} -eq 1 ]; then
+        candidate="${subdirs[0]}"
+        if [ -f "$candidate/inference.pdiparams" ] || [ -f "$candidate/model_state.pdparams" ]; then
+            echo "Using nested model directory: $candidate"
+            MODEL_DIR="$candidate"
+        fi
+    fi
+fi
+
 echo "Converting model from $MODEL_DIR to $OUTPUT_DIR..."
 
 # Use paddlex for conversion
