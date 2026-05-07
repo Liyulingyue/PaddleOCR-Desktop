@@ -10,6 +10,7 @@ use crate::AppState;
 
 #[derive(Debug, Serialize)]
 pub struct OcrTextRegion {
+    #[serde(rename = "box")]
     pub bbox: Vec<Vec<f32>>,
     pub text: String,
     #[serde(rename = "text_confidence")]
@@ -169,19 +170,23 @@ pub async fn draw(
             continue;
         }
 
-        if let Some(box_pts) = region.get("bbox").and_then(|v| v.as_array()) {
-            let pts: Vec<(u32, u32)> = box_pts.iter()
-                .filter_map(|p| {
-                    let arr = p.as_array()?;
-                    let x = arr.first()?.as_f64()? as u32;
-                    let y = arr.get(1)?.as_f64()? as u32;
-                    Some((x.min(width.saturating_sub(1)), y.min(height.saturating_sub(1))))
-                })
-                .collect();
+        let box_pts = region.get("box")
+            .and_then(|v| v.as_array())
+            .or_else(|| region.get("bbox").and_then(|v| v.as_array()));
 
-            if pts.len() >= 4 {
-                draw_polygon(&mut img, &pts, image::Rgb([0u8, 255, 0]));
-            }
+        let Some(box_pts) = box_pts else { continue };
+
+        let pts: Vec<(u32, u32)> = box_pts.iter()
+            .filter_map(|p| {
+                let arr = p.as_array()?;
+                let x = arr.first()?.as_f64()? as u32;
+                let y = arr.get(1)?.as_f64()? as u32;
+                Some((x.min(width.saturating_sub(1)), y.min(height.saturating_sub(1))))
+            })
+            .collect();
+
+        if pts.len() >= 4 {
+            draw_polygon(&mut img, &pts, image::Rgb([0u8, 255, 0]));
         }
     }
 
