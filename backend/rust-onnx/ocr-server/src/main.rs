@@ -37,8 +37,8 @@ async fn main() {
         .allow_headers(Any);
 
     let app = Router::new()
-        .route("/api/health/", get(routes::health::health))
-        .route("/api/ocr/", post(routes::ocr::recognize))
+        .route("/api/health", get(routes::health::health))
+        .route("/api/ocr", post(routes::ocr::recognize))
         .route("/api/ocr/draw", post(routes::ocr::draw))
         .route("/api/ocr/ocr2text", post(routes::ocr::ocr2text))
         .route("/api/ocr/load", post(routes::ocr::load))
@@ -46,7 +46,7 @@ async fn main() {
         .route("/api/ocr/model_status", get(routes::ocr::model_status))
         .route("/api/ocr/options", get(routes::ocr::options))
         .route("/api/ocr/download_missing", post(routes::ocr::download_missing))
-        .route("/api/ppstructure/", post(routes::ppstructure::analyze))
+        .route("/api/ppstructure", post(routes::ppstructure::analyze))
         .route("/api/ppstructure/draw", post(routes::ppstructure::draw))
         .route("/api/ppstructure/markdown", post(routes::ppstructure::markdown))
         .route("/api/ppstructure/model_status", get(routes::ppstructure::model_status))

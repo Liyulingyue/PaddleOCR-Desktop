@@ -19,3 +19,4 @@ ort = { version = "=2.0.0-rc.10", default-features = false, features = ["ndarray
 mime = "0.3"
 base64 = "0.22"
 dirs.workspace = true
+pdf.workspace = true

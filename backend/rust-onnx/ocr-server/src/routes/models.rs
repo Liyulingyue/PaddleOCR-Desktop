@@ -3,16 +3,11 @@ use axum::{
     Json,
 };
 use crate::AppState;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Serialize)]
-pub struct ListResponse {
-    pub models: Vec<ocr_lib::registry::ModelListEntry>,
-}
-
-pub async fn list(State(state): State<AppState>) -> Json<ListResponse> {
+pub async fn list(State(state): State<AppState>) -> Json<Vec<ocr_lib::registry::ModelInfo>> {
     let models = state.registry.list_models();
-    Json(ListResponse { models })
+    Json(models)
 }
 
 #[derive(Serialize)]
@@ -26,7 +21,7 @@ pub async fn download(
     State(state): State<AppState>,
     Path(model_name): Path<String>,
 ) -> Json<DownloadResponse> {
-    match state.registry.download_model(&model_name) {
+    match state.registry.download_model(&model_name).await {
         Ok(path) => Json(DownloadResponse {
             success: true,
             message: format!("{} downloaded successfully", model_name),
@@ -62,13 +57,8 @@ pub async fn delete_model(
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct BatchRequest {
-    pub model_names: Vec<String>,
-}
-
 #[derive(Debug, Serialize)]
-pub struct BatchDownloadResult {
+pub struct BatchResult {
     pub model: String,
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,61 +66,54 @@ pub struct BatchDownloadResult {
 }
 
 #[derive(Debug, Serialize)]
-pub struct BatchDownloadResponse {
-    pub results: Vec<BatchDownloadResult>,
+pub struct BatchResponse {
+    pub results: Vec<BatchResult>,
 }
 
 pub async fn batch_download(
     State(state): State<AppState>,
-    Json(req): Json<BatchRequest>,
-) -> Json<BatchDownloadResponse> {
-    let results: Vec<BatchDownloadResult> = req.model_names.iter().map(|name| {
-        match state.registry.download_model(name) {
-            Ok(_) => BatchDownloadResult {
-                model: name.clone(),
-                success: true,
-                error: None,
-            },
-            Err(e) => BatchDownloadResult {
-                model: name.clone(),
-                success: false,
-                error: Some(e),
-            },
-        }
-    }).collect();
-    Json(BatchDownloadResponse { results })
-}
-
-#[derive(Debug, Serialize)]
-pub struct BatchDeleteResult {
-    pub model: String,
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct BatchDeleteResponse {
-    pub results: Vec<BatchDeleteResult>,
+    Json(model_names): Json<Vec<String>>,
+) -> Json<BatchResponse> {
+    let results: Vec<BatchResult> = model_names
+        .iter()
+        .map(|name| {
+            match state.registry.blocking_download(name) {
+                Ok(_) => BatchResult {
+                    model: name.clone(),
+                    success: true,
+                    error: None,
+                },
+                Err(e) => BatchResult {
+                    model: name.clone(),
+                    success: false,
+                    error: Some(e),
+                },
+            }
+        })
+        .collect();
+    Json(BatchResponse { results })
 }
 
 pub async fn batch_delete(
     State(state): State<AppState>,
-    Json(req): Json<BatchRequest>,
-) -> Json<BatchDeleteResponse> {
-    let results: Vec<BatchDeleteResult> = req.model_names.iter().map(|name| {
-        match state.registry.delete_model(name) {
-            Ok(()) => BatchDeleteResult {
-                model: name.clone(),
-                success: true,
-                error: None,
-            },
-            Err(e) => BatchDeleteResult {
-                model: name.clone(),
-                success: false,
-                error: Some(e),
-            },
-        }
-    }).collect();
-    Json(BatchDeleteResponse { results })
+    Json(model_names): Json<Vec<String>>,
+) -> Json<BatchResponse> {
+    let results: Vec<BatchResult> = model_names
+        .iter()
+        .map(|name| {
+            match state.registry.delete_model(name) {
+                Ok(()) => BatchResult {
+                    model: name.clone(),
+                    success: true,
+                    error: None,
+                },
+                Err(e) => BatchResult {
+                    model: name.clone(),
+                    success: false,
+                    error: Some(e),
+                },
+            }
+        })
+        .collect();
+    Json(BatchResponse { results })
 }

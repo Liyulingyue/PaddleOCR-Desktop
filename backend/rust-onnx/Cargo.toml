@@ -20,3 +20,4 @@ dirs = "5"
 bytes = "1"
 oar-ocr = { version = "0.3.0" }
 ort = { version = "=2.0.0-rc.10" }
+pdf = "0.10"
