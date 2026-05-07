@@ -1,0 +1,21 @@
+[package]
+name = "ocr-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ocr-lib = { path = "../ocr-lib" }
+tokio.workspace = true
+axum = { workspace = true, features = ["multipart"] }
+tower.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bytes.workspace = true
+image.workspace = true
+thiserror.workspace = true
+oar-ocr.workspace = true
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["ndarray", "std", "copy-dylibs", "tracing"] }
+mime = "0.3"
+base64 = "0.22"
+dirs.workspace = true
