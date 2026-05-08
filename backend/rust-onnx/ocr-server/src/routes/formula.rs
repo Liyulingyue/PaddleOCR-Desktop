@@ -105,13 +105,11 @@ pub async fn recognize(
     let elapsed = start.elapsed().as_secs_f64() * 1000.0;
 
     let formula = result.formulas.first().cloned().unwrap_or_default();
-    let score = result.scores.first().copied().flatten();
 
     Ok(Json(serde_json::json!({
         "latex": formula,
         "elapsed": elapsed,
         "input_size": [384, 384],
-        "score": score
     })))
 }
 

@@ -1,9 +1,10 @@
 use axum::{
     extract::{Multipart, State},
-    response::Json,
+    response::{IntoResponse, Json, Response},
 };
 use bytes::Bytes;
 use serde::Serialize;
+use std::io::Cursor;
 
 use crate::AppState;
 
@@ -19,37 +20,63 @@ fn build_uvdoc_predictor(state: &AppState) -> Result<oar_ocr::predictors::Docume
 pub async fn unwarp(
     State(state): State<AppState>,
     mut multipart: Multipart,
-) -> Result<Json<serde_json::Value>, String> {
+) -> Result<Response, (axum::http::StatusCode, Json<serde_json::Value>)> {
     let mut image_data: Option<Bytes> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| e.to_string())? {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() })))
+    })? {
         let name = field.name().unwrap_or("").to_string();
         if name == "file" {
-            image_data = Some(field.bytes().await.map_err(|e| e.to_string())?);
+            image_data = Some(field.bytes().await.map_err(|e| {
+                (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() })))
+            })?);
         }
     }
 
-    let data = image_data.ok_or("No image file provided")?;
-    let img = load_image_from_bytes(&data)?;
+    let data = image_data.ok_or_else(|| {
+        (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "No image file provided" })))
+    })?;
+    let img = load_image_from_bytes(&data).map_err(|e| {
+        (axum::http::StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e })))
+    })?;
+    let (orig_w, orig_h) = (img.width(), img.height());
 
-    let predictor = build_uvdoc_predictor(&state)?;
-    let result = predictor.predict(vec![img])
-        .map_err(|e| format!("UVDoc failed: {}", e))?;
+    let start = std::time::Instant::now();
+    let predictor = build_uvdoc_predictor(&state).map_err(|e| {
+        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e })))
+    })?;
+    let result = predictor.predict(vec![img]).map_err(|e| {
+        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": format!("UVDoc failed: {}", e) })))
+    })?;
 
-    let rectified = result.images.into_iter().next()
-        .ok_or("No rectified image returned")?;
+    let rectified = result.images.into_iter().next().ok_or_else(|| {
+        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "No rectified image returned" })))
+    })?;
 
-    let mut buf = std::io::Cursor::new(Vec::new());
-    rectified.write_to(&mut buf, image::ImageFormat::Png)
-        .map_err(|e| format!("Failed to encode image: {}", e))?;
+    let elapsed = start.elapsed().as_secs_f64();
+    let (result_w, result_h) = (rectified.width(), rectified.height());
 
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(buf.into_inner());
+    let mut buf = Cursor::new(Vec::new());
+    rectified.write_to(&mut buf, image::ImageFormat::Png).map_err(|e| {
+        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": format!("Failed to encode image: {}", e) })))
+    })?;
 
-    Ok(Json(serde_json::json!({
-        "image": b64,
-        "format": "png"
-    })))
+    let png_bytes = buf.into_inner();
+
+    let header_elapsed = format!("{:.3}", elapsed);
+    let header_orig_shape = format!("{},{}", orig_h, orig_w);
+    let header_result_shape = format!("{},{}", result_h, result_w);
+
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, "image/png"),
+            ("X-Elapsed-Time".parse().unwrap(), header_elapsed.as_str()),
+            ("X-Original-Shape".parse().unwrap(), header_orig_shape.as_str()),
+            ("X-Result-Shape".parse().unwrap(), header_result_shape.as_str()),
+        ],
+        png_bytes,
+    ).into_response())
 }
 
 pub async fn load_model(

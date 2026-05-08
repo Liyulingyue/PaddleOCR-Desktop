@@ -34,7 +34,7 @@
 - [x] `/api/ocr/download_missing`
 - [x] `OcrEngine` pipeline 缓存 (`Arc<Mutex<HashMap<String, Arc<OAROCR>>>>`)
 - [x] `OAROCRBuilder` 链式构建
-- [x] `model_key` 格式: `"det|rec|doc_cls|textline_cls"`
+- [x] `model_key` 格式: `"det|rec|doc_cls|textline_cls|uvdoc"` (含 UVDoc)
 - [x] 添加 `default_dict()` 方法
 
 ### 模型注册 (`ModelRegistry`)
@@ -91,14 +91,25 @@
 - **问题**: Python `/api/ocr` 有 `use_uvdoc: bool` 和 `uvdoc_model` 参数，Rust 完全没用
 - **oar-ocr 支持**: `OAROCRBuilder::with_document_image_rectification(model_path)` 将 UVDoc 集成到 OCR pipeline
 - **需要修改**: `ocr.rs` 的 `recognize` 和 `load` 路由，解析 `use_uvdoc` 和 `uvdoc_model` 参数，条件构建时加入 rectification
+- **状态**: ✅ 已完成
+  - `engine.rs`: `model_key` 格式扩为 `"det|rec|doc_cls|textline_cls|uvdoc"` (5部分)
+  - `engine.rs`: `build_pipeline()` 解析 uvdoc 部分，调用 `with_document_image_rectification()`
+  - `ocr.rs`: `build_model_key()` 包含 `uvdoc_model` 参数
 
 #### 2. OCR 路由缺失印章检测模式
 - **问题**: oar-ocr 支持 `text_type("seal")` 印章文本检测
 - **需要**: 在 `recognize` 路由中添加 `text_type` 参数支持
+- **状态**: ✅ 已完成
+  - `OcrParams` 添加 `text_type: Option<String>`
+  - `model_key` 第8部分: seal模式字符串
+  - `build_pipeline`: 调用 `.text_type(seal_mode)` 条件构建
 
 #### 3. UVDoc `/unwarp` 响应格式对齐
 - **问题**: Python 返回 `StreamingResponse` (PNG bytes + headers)，Rust 返回 JSON + base64
 - **需要**: 确认前端实际期望的格式
+- **状态**: ✅ 已完成
+  - 成功: 直接返回 PNG 二进制 + headers (`X-Elapsed-Time`, `X-Original-Shape`, `X-Result-Shape`)
+  - 错误: 返回 `StatusCode + JSON { "error": "..." }`
 
 ### 中优先级
 
@@ -106,31 +117,69 @@
 - **问题**: `analyze` 返回的 JSON 字段可能与 Python 格式不完全一致
 - **需要**: 对比 Python `ppstructure.py` 的返回格式，逐字段对齐
 - **参考**: `StructureResult` 包含 `layout_elements`, `tables`, `formulas`, `text_regions`, `orientation_angle`, `region_blocks`, `rectified_img`
+- **状态**: ✅ 已完成
+  - `layout_regions[i].bbox` 从 `{points: [[x,y]...]}` 改为 `[x1,y1,x2,y2]` (axis-aligned)
+  - 添加 `image_shape`, `rotated_image_shape`, `rotation_confidence`, `uvdoc_applied`
+  - `tables` → `table_regions`, `formulas` → `formula_regions`
+  - `table_regions[i].html` → `table_html`, `table_regions[i].table_type` → `type: "table"`
+  - `text_regions[i].box` → `bbox`, 添加 `type`, `confidence`, `text_confidence`
+  - 添加 `figure_regions` 数组
+  - 更新 `draw` 函数以适配新的 bbox 格式
 
 #### 5. PP-Structure `/draw` 完整实现
 - **问题**: 当前 draw 只画了 bbox 框，未绘制表格/公式的详细内容
 - **需要**: 根据 Python 的 `draw` 逻辑，完整实现表格/公式区域的绘制
+- **状态**: ✅ 已完成
+  - 支持图像旋转 (90/180/270°)
+  - 支持 PDF 多页，返回 JSON + base64
+  - 单图直接返回 PNG
+  - 绘制 layout regions 带类型标签
+  - 修复 `markdown` 函数字段名对齐 (`table_regions`, `formula_regions`, `table_html`, `formula_latex`)
 
 #### 6. PP-Structure `/markdown` 增强
 - **问题**: 当前 markdown 生成逻辑较简单
 - **需要**: 对比 Python 实现，增强表格 LaTeX → HTML 转换、公式渲染等
+- **状态**: ✅ 已完成
+  - 合并 `text_regions`, `table_regions`, `formula_regions`, `figure_regions` 按阅读顺序排序 (y, x)
+  - 解析 HTML 表格为 Markdown 表格
+  - 支持 `doc_title`(一级标题), `paragraph_title/figure_title/table_title/chart_title`(二级标题), `list`(列表项)
+  - Figure/image 从原图裁剪并 base64 编码，随 `images` 数组返回
+  - 公式支持 `$$latex$$` 和回退 `` `text` ``
+  - 支持 PDF 文件上传用于图片裁剪
 
 #### 7. formula 路由响应格式对齐
 - **需要**: 对比 Python `formula.py` 的返回格式
+- **状态**: ✅ 已完成
+  - `recognize` 返回 `{latex, elapsed, input_size}` — 移除多余的 `score` 字段
 
 ### 低优先级
 
 #### 8. 批处理参数支持
 - **oar-ocr 支持**: `image_batch_size()`, `region_batch_size()` 批处理控制
 - **需要**: 在 OCR/Structure 路由中添加相应参数
+- **状态**: ✅ 已完成
+  - `OcrParams` 添加 `image_batch_size: Option<usize>` 和 `region_batch_size: Option<usize>`
+  - `model_key` 第9-10部分: image_batch_size, region_batch_size
+  - `build_pipeline`: 调用 `.image_batch_size()` 和 `.region_batch_size()` 条件构建
 
 #### 9. 词级边界框
 - **oar-ocr 支持**: `return_word_box(true)` 返回词级边界框
 - **需要**: 在 OCR 路由中暴露此功能
+- **状态**: ✅ 已完成
+  - `OcrParams` 添加 `return_word_box: bool`
+  - `model_key` 第11部分: "1" 或 ""
+  - `build_pipeline`: 调用 `.return_word_box(true)` 条件构建
+  - `OcrTextRegion` 添加 `word_box: Option<Vec<Vec<Vec<f32>>>>` 字段
+  - `format_text_region`: 从 `r.word_boxes` 提取词级边界框
 
 #### 10. 检测/识别阈值参数
 - **oar-ocr 支持**: `TextDetectionConfig`, `TextRecognitionConfig` 可配置阈值
 - **需要**: 在路由中添加 `det_db_thresh`, `rec_thresh` 等参数
+- **状态**: ✅ 已完成
+  - `OcrParams` 添加 `det_db_thresh` (已有) 和 `rec_thresh`
+  - `model_key` 扩为 7 部分: `"det|rec|doc_cls|textline_cls|uvdoc|det_thresh|rec_thresh"`
+  - `build_pipeline`: 解析阈值，创建 `TextDetectionConfig` (score_threshold=det_thresh) 和 `TextRecognitionConfig` (score_threshold=rec_thresh)，传入 `OAROCRBuilder`
+  - `predict_with_rec_thresh`: 在返回结果后按 rec_thresh 过滤 text_regions
 
 #### 11. 端到端测试
 - **需要**: 启动 rust-onnx 服务，测试所有路由与 Python 后端的一致性
@@ -151,18 +200,19 @@ use oar_ocr::prelude::*;
 OAROCRBuilder::new(det_path, rec_path, dict_path)
     .with_document_image_orientation_classification(doc_cls_path)
     .with_text_line_orientation_classification(textline_cls_path)
-    .with_document_image_rectification(uvdoc_path)  // <-- 缺失！
-    .text_type("seal")                              // <-- 缺失！
-    .return_word_box(true)                          // <-- 缺失！
-    .image_batch_size(4)
-    .region_batch_size(32)
+    .with_document_image_rectification(uvdoc_path)  // ✅ 已集成
+    .text_type("seal")                              // ✅ 已集成 (条件调用)
+    .return_word_box(true)                          // ✅ 已集成 (条件调用)
+    .image_batch_size(4)                            // ✅ 已集成 (条件调用)
+    .region_batch_size(32)                          // ✅ 已集成 (条件调用)
     .build()
 ```
 
 ### model_key 格式
 ```
-"pp-ocrv5_mobile_det|pp-ocrv5_mobile_rec|pp-lcnet_x1_0_doc_ori|pp-lcnet_x1_0_textline_ori"
+"pp-ocrv5_mobile_det|pp-ocrv5_mobile_rec|pp-lcnet_x1_0_doc_ori|pp-lcnet_x1_0_textline_ori|uvdoc|det_thresh|rec_thresh|text_type|image_batch|region_batch|word_box"
 ```
+(11 parts total, defaults: `||` for thresholds, empty for seal/batch/word_box)
 
 ### OARStructureBuilder 完整链
 ```rust

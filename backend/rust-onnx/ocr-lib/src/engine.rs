@@ -1,4 +1,5 @@
 use oar_ocr::prelude::*;
+use oar_ocr::domain::{TextDetectionConfig, TextRecognitionConfig};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -54,6 +55,14 @@ impl OcrEngine {
         let rec_model = parts.get(1).copied().unwrap_or(Self::default_rec());
         let doc_cls_model = parts.get(2).copied();
         let textline_cls_model = parts.get(3).copied();
+        let uvdoc_model = parts.get(4).copied();
+        let det_thresh: f32 = parts.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.3);
+        let rec_thresh: f32 = parts.get(6).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+
+        let seal_mode = parts.get(7).copied().filter(|s| !s.is_empty());
+        let image_batch_size: Option<usize> = parts.get(8).and_then(|s| s.parse().ok());
+        let region_batch_size: Option<usize> = parts.get(9).and_then(|s| s.parse().ok());
+        let return_word_box = parts.get(10).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0) != 0;
 
         let det_path = Self::resolve_model(models_dir, det_model)?;
         let rec_path = Self::resolve_model(models_dir, rec_model)?;
@@ -61,16 +70,58 @@ impl OcrEngine {
 
         let mut builder = OAROCRBuilder::new(&det_path, &rec_path, &dict_path);
 
+        let det_cfg = TextDetectionConfig {
+            score_threshold: det_thresh,
+            ..Default::default()
+        };
+        builder = builder.text_detection_config(det_cfg);
+
+        if rec_thresh > 0.0 {
+            let rec_cfg = TextRecognitionConfig {
+                score_threshold: rec_thresh,
+                ..Default::default()
+            };
+            builder = builder.text_recognition_config(rec_cfg);
+        }
+
         if let Some(cls) = doc_cls_model {
-            if let Ok(path) = Self::resolve_model(models_dir, cls) {
-                builder = builder.with_document_image_orientation_classification(&path);
+            if !cls.is_empty() {
+                if let Ok(path) = Self::resolve_model(models_dir, cls) {
+                    builder = builder.with_document_image_orientation_classification(&path);
+                }
             }
         }
 
         if let Some(cls) = textline_cls_model {
-            if let Ok(path) = Self::resolve_model(models_dir, cls) {
-                builder = builder.with_text_line_orientation_classification(&path);
+            if !cls.is_empty() {
+                if let Ok(path) = Self::resolve_model(models_dir, cls) {
+                    builder = builder.with_text_line_orientation_classification(&path);
+                }
             }
+        }
+
+        if let Some(uvdoc) = uvdoc_model {
+            if !uvdoc.is_empty() {
+                if let Ok(path) = Self::resolve_model(models_dir, uvdoc) {
+                    builder = builder.with_document_image_rectification(&path);
+                }
+            }
+        }
+
+        if let Some(mode) = seal_mode {
+            builder = builder.text_type(mode);
+        }
+
+        if let Some(batch) = image_batch_size {
+            builder = builder.image_batch_size(batch);
+        }
+
+        if let Some(batch) = region_batch_size {
+            builder = builder.region_batch_size(batch);
+        }
+
+        if return_word_box {
+            builder = builder.return_word_box(true);
         }
 
         builder.build().map_err(|e| e.to_string())
@@ -97,7 +148,7 @@ impl OcrEngine {
 
     pub fn default_model_key() -> String {
         format!(
-            "{}|{}|{}|{}",
+            "{}|{}|{}|{}|||||",
             Self::default_det(),
             Self::default_rec(),
             Self::default_doc_cls(),
@@ -129,6 +180,18 @@ impl OcrEngine {
         let pipeline = self.get_or_build_pipeline(model_key)?;
         let results = pipeline.predict(vec![img]).map_err(|e| e.to_string())?;
         Ok(results.into_iter().next().unwrap())
+    }
+
+    pub fn predict_with_rec_thresh(&self, img: image::RgbImage, model_key: &str, rec_thresh: f32) -> Result<OAROCRResult, String> {
+        let pipeline = self.get_or_build_pipeline(model_key)?;
+        let mut result = pipeline.predict(vec![img]).map_err(|e| e.to_string())?
+            .into_iter().next().unwrap();
+        if rec_thresh > 0.0 {
+            result.text_regions.retain(|r| {
+                r.confidence.unwrap_or(0.0) >= rec_thresh
+            });
+        }
+        Ok(result)
     }
 
     pub fn unload(&self) -> Result<(), String> {

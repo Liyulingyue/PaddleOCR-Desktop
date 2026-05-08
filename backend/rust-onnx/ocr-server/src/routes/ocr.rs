@@ -25,6 +25,8 @@ pub struct OcrTextRegion {
     pub textline_rotation: f32,
     #[serde(rename = "textline_rotation_confidence")]
     pub textline_rotation_confidence: f32,
+    #[serde(rename = "word_box", skip_serializing_if = "Option::is_none")]
+    pub word_box: Option<Vec<Vec<Vec<f32>>>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -67,6 +69,16 @@ pub struct OcrParams {
     pub textline_cls_model: Option<String>,
     #[serde(rename = "uvdoc_model", default)]
     pub uvdoc_model: Option<String>,
+    #[serde(rename = "rec_thresh", default)]
+    pub rec_thresh: f32,
+    #[serde(rename = "text_type", default)]
+    pub text_type: Option<String>,
+    #[serde(rename = "image_batch_size", default)]
+    pub image_batch_size: Option<usize>,
+    #[serde(rename = "region_batch_size", default)]
+    pub region_batch_size: Option<usize>,
+    #[serde(rename = "return_word_box", default)]
+    pub return_word_box: bool,
 }
 
 impl Default for OcrParams {
@@ -85,6 +97,11 @@ impl Default for OcrParams {
             doc_cls_model: None,
             textline_cls_model: None,
             uvdoc_model: None,
+            rec_thresh: 0.0,
+            text_type: None,
+            image_batch_size: None,
+            region_batch_size: None,
+            return_word_box: false,
         }
     }
 }
@@ -95,6 +112,13 @@ fn format_text_region(r: &TextRegion) -> OcrTextRegion {
         .collect();
     let doc_angle = r.orientation_angle.unwrap_or(0.0);
     let rec_conf = r.confidence.unwrap_or(1.0);
+
+    let word_box = r.word_boxes.as_ref().map(|wboxes| {
+        wboxes.iter().map(|wb| {
+            wb.points.iter().map(|p| vec![p.x, p.y]).collect()
+        }).collect()
+    });
+
     OcrTextRegion {
         bbox: pts,
         text: r.text.as_ref().map(|t| t.to_string()).unwrap_or_default(),
@@ -103,6 +127,7 @@ fn format_text_region(r: &TextRegion) -> OcrTextRegion {
         doc_rotation_confidence: 0.0,
         textline_rotation: doc_angle,
         textline_rotation_confidence: 0.0,
+        word_box,
     }
 }
 
@@ -122,12 +147,28 @@ fn build_model_key(params: &OcrParams) -> String {
     let textline_cls = params.textline_cls_model.as_deref()
         .filter(|s| !s.is_empty() && *s != "Default")
         .or(parts.get(3).copied());
+    let uvdoc = params.uvdoc_model.as_deref()
+        .filter(|s| !s.is_empty() && *s != "Default");
 
-    if let (Some(d), Some(t)) = (doc_cls, textline_cls) {
-        format!("{}|{}|{}|{}", det, rec, d, t)
+    let doc_cls_str = doc_cls.unwrap_or("");
+    let textline_cls_str = textline_cls.unwrap_or("");
+
+    let det_thresh_str = if params.det_db_thresh != 0.3 {
+        params.det_db_thresh.to_string()
     } else {
-        format!("{}|{}||", det, rec)
-    }
+        String::new()
+    };
+    let rec_thresh_str = if params.rec_thresh > 0.0 {
+        params.rec_thresh.to_string()
+    } else {
+        String::new()
+    };
+    let seal_str = params.text_type.as_deref().filter(|s| !s.is_empty()).unwrap_or("");
+    let img_batch_str = params.image_batch_size.map(|s| s.to_string()).unwrap_or_default();
+    let reg_batch_str = params.region_batch_size.map(|s| s.to_string()).unwrap_or_default();
+    let word_box_str = if params.return_word_box { "1" } else { "" };
+
+    format!("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", det, rec, doc_cls_str, textline_cls_str, uvdoc.unwrap_or(""), det_thresh_str, rec_thresh_str, seal_str, img_batch_str, reg_batch_str, word_box_str)
 }
 
 pub async fn recognize(
@@ -183,6 +224,24 @@ pub async fn recognize(
             "uvdoc_model" => {
                 params.uvdoc_model = Some(field.text().await.map_err(|e| e.to_string())?);
             }
+            "rec_thresh" => {
+                params.rec_thresh = field.text().await.map_err(|e| e.to_string())?.parse().unwrap_or(0.0);
+            }
+            "text_type" => {
+                let t = field.text().await.map_err(|e| e.to_string())?;
+                if !t.is_empty() && t != "default" {
+                    params.text_type = Some(t);
+                }
+            }
+            "image_batch_size" => {
+                params.image_batch_size = field.text().await.map_err(|e| e.to_string())?.parse().ok();
+            }
+            "region_batch_size" => {
+                params.region_batch_size = field.text().await.map_err(|e| e.to_string())?.parse().ok();
+            }
+            "return_word_box" => {
+                params.return_word_box = field.text().await.map_err(|e| e.to_string())?.parse().unwrap_or(false);
+            }
             _ => {}
         }
     }
@@ -203,7 +262,7 @@ pub async fn recognize(
 
         let mut all_pages = Vec::new();
         for (page_idx, img) in images.iter().enumerate() {
-            let result = state.engine.predict(img.clone(), &model_key).map_err(|e| e.to_string())?;
+            let result = state.engine.predict_with_rec_thresh(img.clone(), &model_key, params.rec_thresh).map_err(|e| e.to_string())?;
             let regions: Vec<OcrTextRegion> = result.text_regions.iter()
                 .filter(|r| r.has_text())
                 .map(format_text_region)
@@ -217,7 +276,7 @@ pub async fn recognize(
         Ok(Json(serde_json::json!({ "results": all_pages })).into_response())
     } else {
         let img = load_image_from_bytes(&data)?;
-        let result = state.engine.predict(img, &model_key).map_err(|e| e.to_string())?;
+        let result = state.engine.predict_with_rec_thresh(img, &model_key, params.rec_thresh).map_err(|e| e.to_string())?;
         let ocr_results: Vec<OcrTextRegion> = result.text_regions.iter()
             .filter(|r| r.has_text())
             .map(format_text_region)
