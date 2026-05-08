@@ -181,7 +181,16 @@
   - `build_pipeline`: 解析阈值，创建 `TextDetectionConfig` (score_threshold=det_thresh) 和 `TextRecognitionConfig` (score_threshold=rec_thresh)，传入 `OAROCRBuilder`
   - `predict_with_rec_thresh`: 在返回结果后按 rec_thresh 过滤 text_regions
 
-#### 11. 端到端测试
+#### 11. PaddleOCR-VL / oar-ocr-vl 集成
+- **oar-ocr-vl**: 独立的 VL crate，基于 Candle 推理（非 ONNX），支持 PaddleOCR-VL、UniRec、HunyuanOCR、DocParser
+- **Python**: 当前没有 PaddleOCR-VL 支持
+- **需要**: 在 rust-onnx 中引入 `oar-ocr-vl` crate，添加 VL 路由和模型管理
+- **状态**: 待完成
+- **关键 API**: `PaddleOcrVl::from_dir()`, `UniRec::from_dir()`, `DocParser`
+- **任务类型**: `Ocr`, `Table`, `Formula`, `Chart`, `Spotting`, `Seal`
+- **依赖**: Candle 推理后端，可能需要 CUDA feature
+
+#### 12. 端到端测试
 - **需要**: 启动 rust-onnx 服务，测试所有路由与 Python 后端的一致性
 
 ---
