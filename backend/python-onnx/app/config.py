@@ -191,6 +191,14 @@ PIPELINE_CONFIG: Dict[str, Dict[str, Any]] = {
             "doc_cls": ["PP-LCNet_x1_0_doc_ori-ONNX"],
             "textline_cls": ["PP-LCNet_x1_0_textline_ori-ONNX", "PP-LCNet_x0_25_textline_ori-ONNX"]
         }
+    },
+    "pp_ocr_vl": {
+        "models": {
+            "layout_det": "PP-DocLayout-L-ONNX",
+        },
+        "options": {
+            "layout_model": ["PP-DocLayout-L-ONNX", "PP-DocLayout-M-ONNX", "PP-DocLayout-S-ONNX", "PP-DocLayout_plus-L-ONNX"],
+        }
     }
 }
 

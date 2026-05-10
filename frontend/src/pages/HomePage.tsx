@@ -18,6 +18,9 @@ function HomePage() {
               <button className="primary-btn" onClick={() => navigate('/ppstructurev3')}>
                 PP-Structure V3 布局检测
               </button>
+              <button className="primary-btn" onClick={() => navigate('/ppocr-vl')}>
+                PaddleOCR-VL 1.5 (llama.cpp)
+              </button>
               <button className="primary-btn" onClick={() => navigate('/model-management')}>
                 📦 模型管理
               </button>

@@ -7,6 +7,7 @@ from .router.ppstructure import router as ppstructure_router
 from .router.models import router as models_router
 from .router.uvdoc import router as uvdoc_router
 from .router.formula import router as formula_router
+from .router.ppocr_vl import router as ppocr_vl_router
 
 
 app = FastAPI(title="PaddleOCR ONNX API")
@@ -25,3 +26,4 @@ app.include_router(ppstructure_router, prefix="/api/ppstructure")
 app.include_router(models_router, prefix="/api/models")
 app.include_router(uvdoc_router, prefix="/api/uvdoc")
 app.include_router(formula_router, prefix="/api/formula")
+app.include_router(ppocr_vl_router, prefix="/api/ppocr_vl")
