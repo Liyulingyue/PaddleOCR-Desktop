@@ -41,6 +41,14 @@ python run.py
 
 服务将在 `http://localhost:8000` 启动。
 
+### 打包发布
+
+```bash
+pyinstaller paddleocr_backend.spec --clean
+```
+
+打包后位于 `dist/paddleocr_backend.exe`，运行后显示黑色控制台窗口并输出日志。
+
 ### API接口
 
 #### OCR 接口

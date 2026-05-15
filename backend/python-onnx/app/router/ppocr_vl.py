@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
