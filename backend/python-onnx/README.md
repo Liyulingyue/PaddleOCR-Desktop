@@ -49,6 +49,46 @@ pyinstaller paddleocr_backend.spec --clean
 
 打包后位于 `dist/paddleocr_backend.exe`，运行后显示黑色控制台窗口并输出日志。
 
+### 调用示例
+
+```python
+import requests
+import json
+from pathlib import Path
+
+
+def ocr_image(image_path: str | Path, backend_url: str = "http://127.0.0.1:8000"):
+    """识别图片中的文字"""
+    with open(image_path, "rb") as f:
+        files = {"file": f}
+        resp = requests.post(f"{backend_url}/api/ocr/", files=files)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def ocr_screenshot(backend_url: str = "http://127.0.0.1:8000"):
+    """截屏识别（配合 PIL/numpy）"""
+    import mss
+    import numpy as np
+    import cv2
+
+    with mss.mss() as sct:
+        img = np.array(sct.grab(sct.monitors[1]))
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+    _, img_encoded = cv2.imencode(".png", img)
+    files = {"file": ("screenshot.png", img_encoded.tobytes(), "image/png")}
+    resp = requests.post(f"{backend_url}/api/ocr/", files=files)
+    resp.raise_for_status()
+    return resp.json()
+
+
+# 示例
+result = ocr_image("test.png")
+for item in result["results"]:
+    print(f"{item['text']} (置信度: {item['confidence']:.2f})")
+```
+
 ### API接口
 
 #### OCR 接口

@@ -142,7 +142,8 @@ async def recognize(
         actual_rec_model = rec_model if rec_model not in [None, "Default"] else defaults["ocr_rec"]
         actual_doc_cls_model = doc_cls_model if doc_cls_model not in [None, "Default"] else defaults["doc_cls"]
         actual_textline_cls_model = textline_cls_model if textline_cls_model not in [None, "Default"] else defaults["textline_cls"]
-        
+        actual_uvdoc_model = uvdoc_model if uvdoc_model not in [None, "Default"] else defaults.get("uvdoc")
+
         # 获取或创建pipeline实例
         current_models_key = get_pipeline_models_key(actual_det_model, actual_rec_model, actual_doc_cls_model, actual_textline_cls_model, actual_uvdoc_model)
         pipeline = get_global_pipeline()
