@@ -9,31 +9,22 @@
   color: #fff;
 }
 
-/* Layout for three-column page: 控制板 + 两个并列等宽面板 */
+/* 三列布局: 控制栏 | 预览 | 结果面板 */
 .layout {
   display: grid;
-  /* 左侧控制板固定 360px，中间更宽以用于主预览，右侧为结果面板 */
   grid-template-columns: 360px 1fr 1fr;
-
-/* 无结果时折叠右侧结果面板，让中间占满剩余空间 */
-.layout.no-result {
-  grid-template-columns: 360px minmax(0, 2.6fr); /* 中间更宽 */
-}
-.layout.no-result .result-panel {
-  display: none;
-}
   gap: 20px;
-  height: 100vh; /* 改为全高 */
-  padding: 84px 0px 10px; /* 顶部为 Header 留空，左右内边距更小 */
+  height: 100vh;
+  padding: 84px 0px 10px;
   box-sizing: border-box;
-  width: 100%; /* 使用 100% 避免 100vw 包含滚动条导致水平滚动 */
-  max-width: 1600px; /* 阻止超宽屏过度拉伸 */
-  margin: 0 auto; /* 大屏居中 */
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
   align-items: stretch;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* 小屏适配：堆叠布局并减少左右内边距 */
+/* 小屏适配：堆叠布局 */
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -42,6 +33,7 @@
   }
 }
 
+/* 控制栏 */
 .control-bar {
   background: rgba(255, 255, 255, 0.95);
   border: none;
@@ -50,6 +42,9 @@
   overflow: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .control-bar-header {
@@ -59,7 +54,6 @@
   align-items: center;
   justify-content: space-between;
   min-height: 56px;
-  /* 与其他面板标题的下划线保持水平对齐：向上位移 20px，抵消父容器的 top padding */
   margin-top: -20px;
 }
 
@@ -69,7 +63,7 @@
   font-size: 1.2rem;
   font-weight: 600;
   line-height: 1;
-} 
+}
 
 .control-bar .recent ul {
   list-style: none;
@@ -92,20 +86,106 @@
 }
 
 .control-section {
-  margin: 16px 0;
-  padding: 16px;
+  margin: 8px 0;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* 模型状态样式 */
+.config-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.expand-icon {
+  font-size: 0.7rem;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.config-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-item label {
+  color: #555;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.config-item .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.config-input {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #333;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.range-labels {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-labels input[type="range"] {
+  flex: 1;
+}
+
+.file-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #555;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.file-name {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.config-description {
+  font-size: 0.75rem;
+  color: #888;
+  line-height: 1.4;
+}
+
+/* 模型状态 */
 .model-status .status-loaded {
-  color: #2e7d32; /* green */
+  color: #2e7d32;
   font-weight: 600;
 }
 .model-status .status-unloaded {
-  color: #c62828; /* red */
+  color: #c62828;
   font-weight: 600;
 }
 .model-status .status-unknown {
@@ -116,9 +196,9 @@
 .model-status .model-status-row {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* status left, refresh right */
+  justify-content: space-between;
   gap: 8px;
-  min-height: 36px; /* 使行高一致并居中 */
+  min-height: 36px;
 }
 .model-status .model-status-left {
   display: flex;
@@ -129,12 +209,12 @@
   min-width: 72px;
   color: #333;
   font-weight: 600;
-  line-height: 1; /* 行高统一 */
+  line-height: 1;
   display: inline-flex;
   align-items: center;
 }
 .model-status .model-status-left span {
-  line-height: 1; /* 与 label 对齐 */
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   font-size: 1rem;
@@ -143,36 +223,71 @@
   display: flex;
   align-items: center;
 }
-.model-status .refresh-btn {
-  /* keep small size for refresh */
-  width: auto;
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
+
+/* 按钮 */
+.button-group {
+  display: flex;
+  gap: 8px;
 }
 
-/* 小按钮样式 */
+.control-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
 .control-btn.small {
   width: auto;
   padding: 6px 10px;
   font-size: 0.85rem;
 }
 
+.control-btn.primary-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.control-btn.primary-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.control-btn.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.control-btn.secondary-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border: 1px solid #667eea;
+}
+
+.control-btn.secondary-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.control-btn.secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .model-controls {
   display: flex;
-  flex-direction: row; /* 改为同行 */
+  flex-direction: row;
   gap: 8px;
   margin-top: 10px;
 }
 .model-controls .control-btn {
-  width: auto; /* 由 flex 决定 */
-  flex: 1; /* 等宽分布 */
-}
-.control-btn {
-  width: 100%;
-  margin-bottom: 8px;
+  width: auto;
+  flex: 1;
 }
 
 .page-controls {
@@ -182,10 +297,10 @@
   gap: 8px;
 }
 
-/* 全局消息框样式 */
+/* 全局消息框 */
 .global-message-banner {
   position: fixed;
-  top: 84px; /* 在HeaderBar下面 */
+  top: 84px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
@@ -209,4 +324,11 @@
     transform: translateX(-50%) translateY(0);
     opacity: 1;
   }
+}
+
+/* error */
+.error {
+  color: #c62828;
+  font-size: 0.85rem;
+  margin-top: 4px;
 }

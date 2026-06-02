@@ -55,6 +55,9 @@ function HeaderBar({
             <Link to="/ppstructurev3" className="sidebar-link" onClick={closeSidebar}>
               📄 PP-Structure V3 布局检测
             </Link>
+            <Link to="/ppocr-vl" className="sidebar-link" onClick={closeSidebar}>
+              🖼 PaddleOCR-VL 1.5 视觉语言模型
+            </Link>
             <Link to="/uvdoc" className="sidebar-link" onClick={closeSidebar}>
               📐 UVDoc 文档纠偏
             </Link>

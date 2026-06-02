@@ -1,4 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import Viewer from '../components/Viewer'
+import FileUpload from '../components/FileUpload'
+import ResultPanel from '../components/ResultPanel'
+import ErrorModal from '../components/ErrorModal'
 import { getCachedApiBaseUrl } from '../utils/api'
 
 interface VLPredictionResult {
@@ -27,7 +31,7 @@ function PaddleOCRVLPage() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [apiBaseUrl, setApiBaseUrl] = useState<string>('')
-  const [llamaServerUrl, setLlamaServerUrl] = useState<string>('http://127.0.0.1:8080')
+  const [llamaManagerUrl, setLlamaManagerUrl] = useState<string>('http://127.0.0.1:8081')
   const [layoutModel, setLayoutModel] = useState<string>('Default')
   const [layoutConfThreshold, setLayoutConfThreshold] = useState<number>(0.5)
   const [useLayoutDetection, setUseLayoutDetection] = useState<boolean>(true)
@@ -40,6 +44,8 @@ function PaddleOCRVLPage() {
   const [maxPixels, setMaxPixels] = useState<number | null>(null)
   const [serverConnected, setServerConnected] = useState<boolean>(false)
   const [checkingServer, setCheckingServer] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorModalData, setErrorModalData] = useState<{ title: string; message: string }>({ title: '', message: '' })
   const messageTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const setMessageWithAutoClear = (msg: string | null, duration = 5000) => {
@@ -69,60 +75,43 @@ function PaddleOCRVLPage() {
               setLayoutModel(data.defaults.layout_model)
             }
           }
-        } catch {}
-      } catch {}
+        } catch { /* ignore */ }
+      } catch { /* ignore */ }
     }
     init()
   }, [])
 
   const checkServerConnection = async () => {
-    if (!llamaServerUrl) return
+    if (!llamaManagerUrl) return
     setCheckingServer(true)
     try {
-      const resp = await fetch(`${llamaServerUrl}/v1/models`, { signal: AbortSignal.timeout(5000) })
+      const resp = await fetch(`${llamaManagerUrl}/health`, { signal: AbortSignal.timeout(5000) })
       if (resp.ok) {
         setServerConnected(true)
-        setMessageWithAutoClear('llama.cpp server connected successfully')
+        setMessageWithAutoClear('llama-manager is running')
       } else {
         setServerConnected(false)
-        setError('Server responded but may not be a valid llama.cpp server')
+        setError('llama-manager responded but may not be valid')
       }
     } catch (e: any) {
       setServerConnected(false)
-      setError(`Cannot connect to llama.cpp server: ${e.message || 'timeout or network error'}`)
+      setError(`Cannot connect to llama-manager: ${e.message || 'timeout or network error'}`)
     } finally {
       setCheckingServer(false)
     }
   }
 
-  const handleFileSelect = (selectedFile: File) => {
-    setFile(selectedFile)
-    setResult(null)
-    setDrawnImage(null)
-    setMarkdownContent(null)
-    setMarkdownImages(null)
-  }
-
-  const handleClear = () => {
-    setFile(null)
-    setResult(null)
-    setDrawnImage(null)
-    setMarkdownContent(null)
-    setMarkdownImages(null)
-    setError(null)
-  }
-
   const handleUpload = async () => {
     if (!file) return
-    if (!llamaServerUrl) {
-      setError('Please enter the llama.cpp server URL')
+    if (!llamaManagerUrl) {
+      setError('Please enter the llama-manager URL')
       return
     }
     setLoading(true)
     setError(null)
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('llama_server_url', llamaServerUrl)
+    formData.append('llama_manager_url', llamaManagerUrl)
     formData.append('layout_conf_threshold', layoutConfThreshold.toString())
     formData.append('use_layout_detection', useLayoutDetection.toString())
     formData.append('merge_layout_blocks', mergeLayoutBlocks.toString())
@@ -142,6 +131,22 @@ function PaddleOCRVLPage() {
       const data = await resp.json()
       if (resp.ok) {
         setResult(data)
+
+        const drawFormData = new FormData()
+        drawFormData.append('file', file)
+        drawFormData.append('analysis_result', JSON.stringify(data))
+        const drawResp = await fetch(`${apiBaseUrl}/api/ppocr_vl/draw`, {
+          method: 'POST',
+          body: drawFormData,
+        })
+        if (drawResp.ok) {
+          const contentType = drawResp.headers.get('content-type')
+          if (contentType?.includes('image')) {
+            const blob = await drawResp.blob()
+            const imageUrl = URL.createObjectURL(blob)
+            setDrawnImage(imageUrl)
+          }
+        }
 
         const mdFormData = new FormData()
         mdFormData.append('file', file)
@@ -163,24 +168,15 @@ function PaddleOCRVLPage() {
           setMarkdownContent(mdData.markdown || '')
           setMarkdownImages(imgs)
         }
-
-        const drawFormData = new FormData()
-        drawFormData.append('file', file)
-        drawFormData.append('analysis_result', JSON.stringify(data))
-        const drawResp = await fetch(`${apiBaseUrl}/api/ppocr_vl/draw`, {
-          method: 'POST',
-          body: drawFormData,
-        })
-        if (drawResp.ok) {
-          const contentType = drawResp.headers.get('content-type')
-          if (contentType?.includes('image')) {
-            const blob = await drawResp.blob()
-            const imageUrl = URL.createObjectURL(blob)
-            setDrawnImage(imageUrl)
-          }
-        }
       } else {
-        setError(data.error || 'Prediction failed')
+        if (data.missingFiles) {
+          setErrorModalData({
+            title: '模型文件缺失',
+            message: data.error || '模型文件不完整，请下载缺失的模型文件',
+          })
+        } else {
+          setError(data.error || 'Prediction failed')
+        }
       }
     } catch (e: any) {
       setError(`Network error: ${e.message}`)
@@ -189,277 +185,186 @@ function PaddleOCRVLPage() {
     }
   }
 
+  const handleClear = () => {
+    setFile(null)
+    setResult(null)
+    setDrawnImage(null)
+    setMarkdownContent(null)
+    setMarkdownImages(null)
+    setError(null)
+  }
+
+  const handleFileSelect = (selectedFile: File) => {
+    setFile(selectedFile)
+    setResult(null)
+    setDrawnImage(null)
+    setMarkdownContent(null)
+    setMarkdownImages(null)
+  }
+
   return (
     <div className="layout">
       {message && (
         <div className="global-message-banner">{message}</div>
       )}
 
-      <div className="sidebar">
-        <h2>PaddleOCR-VL 1.5</h2>
+      <aside className="control-bar">
+        <div className="control-bar-header">
+          <h3>PaddleOCR-VL 1.5</h3>
+        </div>
+
+        <FileUpload onFileSelect={handleFileSelect} />
 
         <div className="control-section">
-          <h3>llama.cpp Server</h3>
-          <div className="input-group">
-            <label>Server URL</label>
-            <input
-              type="text"
-              value={llamaServerUrl}
-              onChange={e => { setLlamaServerUrl(e.target.value); setServerConnected(false) }}
-              placeholder="http://127.0.0.1:8080"
-            />
-          </div>
-          <div className="input-group">
-            <button
-              className={`btn ${serverConnected ? 'btn-success' : 'btn-primary'}`}
-              onClick={checkServerConnection}
-              disabled={checkingServer || !llamaServerUrl}
-            >
-              {checkingServer ? 'Checking...' : serverConnected ? 'Connected' : 'Check Connection'}
+          <div className="button-group">
+            <button onClick={handleUpload} disabled={loading || !file} className="control-btn primary-btn">
+              {loading ? 'Processing...' : 'Analyze'}
+            </button>
+            <button onClick={handleClear} disabled={loading} className="control-btn secondary-btn">
+              Clear
             </button>
           </div>
-          <p className="hint">
-            Start llama-server: ./llama-server -m model.gguf --mmproj mmproj.gguf -fa -c 8192
-          </p>
+          {error && <span className="error">{error}</span>}
         </div>
 
         <div className="control-section">
-          <h3>File</h3>
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            onChange={e => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            className="file-input"
-          />
-          {file && <p className="file-name">{file.name}</p>}
-        </div>
-
-        <div className="control-section">
-          <h3>Layout Detection</h3>
-          <div className="input-group">
-            <label>
+          <div className="config-section-header">
+            llama-manager
+            <span className="expand-icon">▼</span>
+          </div>
+          <div className="config-content">
+            <div className="config-item">
+              <label>Manager URL</label>
               <input
-                type="checkbox"
-                checked={useLayoutDetection}
-                onChange={e => setUseLayoutDetection(e.target.checked)}
+                type="text"
+                value={llamaManagerUrl}
+                onChange={e => { setLlamaManagerUrl(e.target.value); setServerConnected(false) }}
+                placeholder="http://127.0.0.1:8081"
+                className="config-input"
               />
-              Enable Layout Detection
-            </label>
+            </div>
+            <div className="config-item">
+              <button
+                onClick={checkServerConnection}
+                disabled={checkingServer || !llamaManagerUrl}
+                className={`control-btn small ${serverConnected ? 'primary-btn' : 'secondary-btn'}`}
+              >
+                {checkingServer ? 'Checking...' : serverConnected ? 'Connected' : 'Check Connection'}
+              </button>
+            </div>
           </div>
-          <div className="input-group">
-            <label>Layout Model</label>
-            <select value={layoutModel} onChange={e => setLayoutModel(e.target.value)}>
-              <option value="Default">Default</option>
-              <option value="PP-DocLayout-L-ONNX">PP-DocLayout-L-ONNX</option>
-              <option value="PP-DocLayout-M-ONNX">PP-DocLayout-M-ONNX</option>
-              <option value="PP-DocLayout-S-ONNX">PP-DocLayout-S-ONNX</option>
-              <option value="PP-DocLayout_plus-L-ONNX">PP-DocLayout_plus-L-ONNX</option>
-            </select>
+        </div>
+
+        <div className="control-section">
+          <div className="config-section-header">
+            Layout Detection
+            <span className="expand-icon">▼</span>
           </div>
-          <div className="input-group">
-            <label>Confidence Threshold: {layoutConfThreshold.toFixed(2)}</label>
-            <input
-              type="range"
-              min="0" max="1" step="0.05"
-              value={layoutConfThreshold}
-              onChange={e => setLayoutConfThreshold(parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="input-group">
-            <label>
+          <div className="config-content">
+            <div className="config-item">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={useLayoutDetection}
+                  onChange={e => setUseLayoutDetection(e.target.checked)}
+                />
+                Enable Layout Detection
+              </label>
+            </div>
+            <div className="config-item">
+              <label className="checkbox-label">
+                Merge Layout Blocks
+              </label>
               <input
                 type="checkbox"
                 checked={mergeLayoutBlocks}
                 onChange={e => setMergeLayoutBlocks(e.target.checked)}
               />
-              Merge Layout Blocks
-            </label>
+            </div>
+            <div className="config-item">
+              <label>Confidence: {layoutConfThreshold.toFixed(2)}</label>
+              <div className="range-labels">
+                <input
+                  type="range" min="0" max="1" step="0.05"
+                  value={layoutConfThreshold}
+                  onChange={e => setLayoutConfThreshold(parseFloat(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="control-section">
-          <h3>VLM Parameters</h3>
-          <div className="input-group">
-            <label>Max New Tokens: {maxNewTokens}</label>
-            <input
-              type="range"
-              min="256" max="8192" step="256"
-              value={maxNewTokens}
-              onChange={e => setMaxNewTokens(parseInt(e.target.value))}
-            />
+          <div className="config-section-header">
+            VLM Parameters
+            <span className="expand-icon">▼</span>
           </div>
-          <div className="input-group">
-            <label>Temperature: {temperature.toFixed(2)}</label>
-            <input
-              type="range"
-              min="0" max="2" step="0.05"
-              value={temperature}
-              onChange={e => setTemperature(parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="input-group">
-            <label>Top-P{topP !== null ? `: ${topP.toFixed(2)}` : ''}</label>
-            <input
-              type="number"
-              min="0" max="1" step="0.05"
-              value={topP ?? ''}
-              placeholder="Leave empty to disable"
-              onChange={e => setTopP(e.target.value ? parseFloat(e.target.value) : null)}
-            />
-          </div>
-          <div className="input-group">
-            <label>Repetition Penalty{repetitionPenalty !== null ? `: ${repetitionPenalty.toFixed(2)}` : ''}</label>
-            <input
-              type="number"
-              min="1" max="2" step="0.05"
-              value={repetitionPenalty ?? ''}
-              placeholder="Leave empty to disable"
-              onChange={e => setRepetitionPenalty(e.target.value ? parseFloat(e.target.value) : null)}
-            />
-          </div>
-          <div className="input-group">
-            <label>Min Pixels{minPixels !== null ? `: ${minPixels}` : ''}</label>
-            <input
-              type="number"
-              value={minPixels ?? ''}
-              placeholder="Leave empty to use default"
-              onChange={e => setMinPixels(e.target.value ? parseInt(e.target.value) : null)}
-            />
-          </div>
-          <div className="input-group">
-            <label>Max Pixels{maxPixels !== null ? `: ${maxPixels}` : ''}</label>
-            <input
-              type="number"
-              value={maxPixels ?? ''}
-              placeholder="Leave empty to use default"
-              onChange={e => setMaxPixels(e.target.value ? parseInt(e.target.value) : null)}
-            />
-          </div>
-        </div>
-
-        <div className="button-group">
-          <button
-            className="btn btn-primary"
-            onClick={handleUpload}
-            disabled={loading || !file}
-          >
-            {loading ? 'Processing...' : 'Analyze'}
-          </button>
-          <button className="btn btn-secondary" onClick={handleClear}>
-            Clear
-          </button>
-        </div>
-
-        {error && (
-          <div className="error-banner">
-            {error}
-          </div>
-        )}
-      </div>
-
-      <div className="main-content">
-        {file && (
-          <div className="viewer-container">
-            <img
-              src={URL.createObjectURL(file)}
-              alt="Input"
-              className="viewer-image"
-            />
-          </div>
-        )}
-
-        {result && (
-          <div className="result-container">
-            <div className="result-tabs">
-              <div className="result-tab active">Results</div>
+          <div className="config-content">
+            <div className="config-item">
+              <label>Max Tokens: {maxNewTokens}</label>
+              <div className="range-labels">
+                <input type="range" min="256" max="8192" step="256" value={maxNewTokens}
+                  onChange={e => setMaxNewTokens(parseInt(e.target.value))} />
+              </div>
             </div>
-
-            <div className="result-content">
-              <div className="result-section">
-                <h4>Layout Detection</h4>
-                {result.layout_det_res?.boxes && (
-                  <div className="result-boxes">
-                    <p>Detected {result.layout_det_res.boxes.length} regions</p>
-                    <div className="box-list">
-                      {result.layout_det_res.boxes.slice(0, 20).map((box: any, i: number) => (
-                        <div key={i} className="box-item">
-                          <span className="box-label">{box.label}</span>
-                          <span className="box-score">{(box.score * 100).toFixed(1)}%</span>
-                        </div>
-                      ))}
-                      {result.layout_det_res.boxes.length > 20 && (
-                        <p className="more">...and {result.layout_det_res.boxes.length - 20} more</p>
-                      )}
-                    </div>
-                  </div>
-                )}
+            <div className="config-item">
+              <label>Temperature: {temperature.toFixed(2)}</label>
+              <div className="range-labels">
+                <input type="range" min="0" max="2" step="0.05" value={temperature}
+                  onChange={e => setTemperature(parseFloat(e.target.value))} />
               </div>
-
-              {drawnImage && (
-                <div className="result-section">
-                  <h4>Visualization</h4>
-                  <img src={drawnImage} alt="Visualization" className="result-image" />
-                </div>
-              )}
-
-              <div className="result-section">
-                <h4>Extracted Content</h4>
-                <div className="content-list">
-                  {result.parsing_res_list?.map((item: any, i: number) => (
-                    <div key={i} className={`content-item content-item-${item.label || 'text'}`}>
-                      <div className="content-header">
-                        <span className="content-label">[{item.label}]</span>
-                        {item.bbox && (
-                          <span className="content-bbox">
-                            ({item.bbox[0]}, {item.bbox[1]}, {item.bbox[2]}, {item.bbox[3]})
-                          </span>
-                        )}
-                      </div>
-                      <div className="content-text">
-                        {item.content ? item.content.substring(0, 500) : '(no content)'}
-                        {item.content && item.content.length > 500 && '...'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {markdownContent && (
-                <div className="result-section">
-                  <h4>Markdown Output</h4>
-                  <div
-                    className="markdown-preview"
-                    dangerouslySetInnerHTML={{
-                      __html: renderMarkdown(markdownContent, markdownImages || {})
-                    }}
-                  />
-                </div>
-              )}
+            </div>
+            <div className="config-item">
+              <label>Top-P</label>
+              <input type="number" min="0" max="1" step="0.05" value={topP ?? ''}
+                placeholder="default"
+                onChange={e => setTopP(e.target.value ? parseFloat(e.target.value) : null)}
+                className="config-input" />
+            </div>
+            <div className="config-item">
+              <label>Repetition Penalty</label>
+              <input type="number" min="1" max="2" step="0.05" value={repetitionPenalty ?? ''}
+                placeholder="default"
+                onChange={e => setRepetitionPenalty(e.target.value ? parseFloat(e.target.value) : null)}
+                className="config-input" />
+            </div>
+            <div className="config-item">
+              <label>Min Pixels</label>
+              <input type="number" value={minPixels ?? ''} placeholder="default"
+                onChange={e => setMinPixels(e.target.value ? parseInt(e.target.value) : null)}
+                className="config-input" />
+            </div>
+            <div className="config-item">
+              <label>Max Pixels</label>
+              <input type="number" value={maxPixels ?? ''} placeholder="default"
+                onChange={e => setMaxPixels(e.target.value ? parseInt(e.target.value) : null)}
+                className="config-input" />
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </aside>
+
+      <Viewer file={file} />
+
+      <ResultPanel
+        result={result}
+        imageFile={file}
+        drawnImage={drawnImage}
+        onMessage={setMessageWithAutoClear}
+        resultType="layout"
+        viewOptions={['json', 'drawn-image', 'markdown']}
+        markdownContent={markdownContent}
+        markdownImages={markdownImages}
+      />
+
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title={errorModalData?.title || ''}
+        message={errorModalData?.message || ''}
+      />
     </div>
   )
-}
-
-function renderMarkdown(md: string, images: { [key: string]: string }): string {
-  let html = md
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-      if (images[src]) {
-        return `<img src="${images[src]}" alt="${alt}" style="max-width:100%;" />`
-      }
-      return `<img src="${src}" alt="${alt}" style="max-width:100%;" />`
-    })
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>')
-
-  return `<p>${html}</p>`
 }
 
 export default PaddleOCRVLPage

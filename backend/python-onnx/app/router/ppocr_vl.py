@@ -266,6 +266,16 @@ async def predict(
         if layout_path is None and use_layout_detection:
             layout_path = get_model_path_from_registry(layout_model) if layout_model else None
 
+        if use_layout_detection and layout_path is None:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Layout detection enabled but no layout model found. "
+                             "Please set layout_model_dir or add layout model to config.py MODEL_REGISTRY.",
+                    "hint": "Set layout_model to a valid model name (e.g. 'PP-DocLayout-L-ONNX') or disable layout detection.",
+                },
+            )
+
         pipeline = PaddleOCRVLPipeline(
             layout_model_path=layout_path,
             genai_config=genai_config,
@@ -299,6 +309,27 @@ async def predict(
                 all_results.append(page_result[0])
 
         pipeline.unload()
+
+        for r in all_results:
+            parsing = r.get("parsing_res_list", [])
+            has_content = any(item.get("content", "").strip() for item in parsing)
+            if not has_content:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error": "VLM inference returned no content. Possible causes: "
+                                 "1) openai package not installed. "
+                                 "2) llama-server not running at the expected URL. "
+                                 "3) VLM model not loaded. "
+                                 "4) Server returned empty response.",
+                        "hint": "Check backend logs. Ensure: pip install openai, llama-manager is running, and llama-server started successfully.",
+                        "_debug": {
+                            "parsing_res_count": len(parsing),
+                            "server_url": server_url,
+                            "layout_path": layout_path,
+                        },
+                    },
+                )
 
         if len(all_results) == 1:
             return all_results[0]
